@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold Platinum Celebration</title>
+    <title>Rose Gold Perfect</title>
     <link rel="icon" href="data:;base64,=">
     <style>
         body { 
             margin: 0; overflow: hidden; background: #010101; font-family: 'Times New Roman', serif; 
-            /* 兼容 Safari 的禁止选中 */
             user-select: none; -webkit-user-select: none; 
         }
         
@@ -16,32 +15,32 @@
         
         h1 {
             color: #FFD1DC; font-size: 3.5rem; letter-spacing: 0.5rem; text-transform: uppercase;
-            text-shadow: 0 0 60px rgba(255, 182, 193, 0.8), 0 0 100px rgba(255, 215, 0, 0.6);
+            /* 保持柔和的高级光感 */
+            text-shadow: 0 0 20px rgba(255, 182, 193, 0.5), 0 0 40px rgba(255, 215, 0, 0.3);
             margin-bottom: 15px; opacity: 0; animation: fadeIn 2s forwards 0.5s; text-align: center;
         }
 
         .hint-container {
             display: flex; align-items: center; gap: 10px;
-            background: rgba(30, 10, 15, 0.7); border: 1px solid rgba(255, 215, 0, 0.4);
+            background: rgba(30, 10, 15, 0.6); border: 1px solid rgba(255, 215, 0, 0.3);
             padding: 15px 40px; border-radius: 50px; 
-            /* 兼容 Safari 的毛玻璃 */
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             opacity: 0; animation: fadeIn 2s forwards 1.5s;
-            box-shadow: 0 0 50px rgba(255, 192, 203, 0.3); transition: all 0.5s;
+            box-shadow: 0 0 30px rgba(255, 192, 203, 0.2); transition: all 0.5s;
         }
-        .hint-text { color: #FFD700; font-size: 1.1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
-        .status-dot { width: 12px; height: 12px; background: #ff3333; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 15px #ff0000; }
-        .status-active { background: #00ff00; box-shadow: 0 0 25px #00ff00; border-color: #ccffcc; }
+        .hint-text { color: #FFD700; font-size: 1.1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
+        .status-dot { width: 12px; height: 12px; background: #ff3333; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 10px #ff0000; }
+        .status-active { background: #00ff00; box-shadow: 0 0 15px #00ff00; border-color: #ccffcc; }
 
         #loader { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; }
-        .circle { width: 120px; height: 120px; border: 4px solid rgba(255, 182, 193, 0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 1s infinite linear; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
+        .circle { width: 120px; height: 120px; border: 3px solid rgba(255, 182, 193, 0.2); border-top: 3px solid #FFD700; border-radius: 50%; animation: spin 1s infinite linear; }
         .log-text { color: #FFD1DC; margin-top: 30px; font-size: 14px; letter-spacing: 4px; font-family: monospace; text-transform: uppercase; }
 
         #webcam-preview { 
             position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; 
-            border: 2px solid rgba(255, 215, 0, 0.5); border-radius: 12px; z-index: 20; 
+            border: 2px solid rgba(255, 215, 0, 0.4); border-radius: 12px; z-index: 20; 
             transform: scaleX(-1); opacity: 0; transition: opacity 0.5s;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -52,7 +51,7 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Initializing Engine...</div>
+        <div class="log-text" id="log">Final Polishing...</div>
     </div>
 
     <div id="ui-layer">
@@ -81,23 +80,21 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        // 核心修复：引入 RoomEnvironment 以获得物理级金属反射
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 电影级参数 ---
+        // --- 最终平衡参数 ---
         const CONFIG = {
             count: 3200, 
             colors: {
-                rose: new THREE.Color(0xFFB7C5).multiplyScalar(1.3),
-                gold: new THREE.Color(0xFFD700).multiplyScalar(1.8),
-                ivory: new THREE.Color(0xFFFFF0).multiplyScalar(1.2),
-                flame: new THREE.Color(0xFF5500).multiplyScalar(2.5),
+                rose: new THREE.Color(0xB76E79), 
+                gold: new THREE.Color(0xFFD700),
+                ivory: new THREE.Color(0xFFFFF0),
+                flame: new THREE.Color(0xFF4500),
                 smoke: new THREE.Color(0x333333)
             },
             blowThreshold: 0.35, 
             spreadThreshold: 0.4, 
-            explodeSpeed: 15.0
         };
 
         let scene, camera, renderer, composer, mainGroup;
@@ -105,17 +102,18 @@
         let puckerFrames = 0;
         let state = { step: 0, rotation: 0, aiReady: false }; 
 
-        // --- 安全数据结构 (预填充防止崩溃) ---
+        // --- 数据结构 (含 scatterPos 用于画幅限制) ---
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
+            // 【关键】限制在画幅内的散开位置
+            scatterPos: new Float32Array(CONFIG.count * 3), 
             currentPos: new Float32Array(CONFIG.count * 3),
             currentRot: new Float32Array(CONFIG.count * 3),
-            explodeVel: new Float32Array(CONFIG.count * 3),
             type: new Uint8Array(CONFIG.count), 
             shapeType: new Uint8Array(CONFIG.count),
             noise: new Float32Array(CONFIG.count),
-            // 安全预填充：默认指向第0个 mesh
+            // 预填充防止报错
             meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
         };
 
@@ -123,7 +121,6 @@
         const logger = document.getElementById('log');
         const guide = document.getElementById('guide');
 
-        // --- 主程序 ---
         async function init() {
             try {
                 logger.innerText = "Creating Cinematic Scene...";
@@ -136,7 +133,7 @@
                 state.aiReady = true;
                 document.getElementById('ai-status').classList.add('status-active');
                 document.getElementById('webcam-preview').style.opacity = 1;
-                guide.innerText = "✨ 请嘟嘴吹灭蜡烛许愿 ✨";
+                guide.innerText = "✨ 嘟嘴吹灭 或 张手炸裂 ✨"; 
                 
             } catch (err) {
                 console.warn("AI Init Failed:", err);
@@ -157,7 +154,6 @@
             });
         }
 
-        // --- 交互逻辑 ---
         function triggerBlowSequence() {
             if (state.step === 0) {
                 state.step = 1; // 熄灭中
@@ -165,7 +161,7 @@
                 setTimeout(() => {
                     state.step = 2; // 变成文字
                     updateTitle("Happy Birthday!", 1);
-                    guide.innerText = state.aiReady ? "👐 张开手掌：释放魔法炸裂" : "🖱️ 移动鼠标观赏";
+                    guide.innerText = state.aiReady ? "👐 张开手掌：粒子炸裂" : "🖱️ 移动鼠标观赏";
                 }, 1800);
             }
         }
@@ -174,8 +170,8 @@
             if (state.step !== 0) {
                 state.step = 0;
                 updateTitle("Princess Celebration", 0); 
-                guide.innerText = state.aiReady ? "✨ 请嘟嘴吹灭蜡烛许愿 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
-                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory); // 复原蜡烛
+                guide.innerText = state.aiReady ? "✨ 嘟嘴吹灭 或 张手炸裂 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
+                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory);
             }
         }
 
@@ -198,12 +194,12 @@
             t.style.opacity = 0;
             setTimeout(() => {
                 t.innerText = text;
-                t.style.textShadow = opacity ? "0 0 60px #FFD700, 0 0 100px #FF69B4, 0 0 30px #fff" : "none";
+                // 平衡后的文字光晕
+                t.style.textShadow = opacity ? "0 0 30px #FFD700, 0 0 50px #FF69B4, 0 0 20px #fff" : "none";
                 t.style.opacity = opacity;
             }, 500);
         }
 
-        // --- 3D 场景 (电影级配置) ---
         function initThree() {
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050205, 0.012);
@@ -218,43 +214,42 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.physicallyCorrectLights = true;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.3;
+            renderer.toneMappingExposure = 1.0; // 舒适的曝光
             document.body.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            // 【关键修复】使用 PMREMGenerator 替代 RenderTargetCube
+            // 环境光反射
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
-            // 灯光
-            const ambient = new THREE.AmbientLight(0xffcce0, 0.6); 
+            // --- 灯光系统 (平衡版) ---
+            const ambient = new THREE.AmbientLight(0xffcce0, 0.4); 
             scene.add(ambient);
             
-            const dirLight = new THREE.DirectionalLight(0xffd700, 4.0);
+            const dirLight = new THREE.DirectionalLight(0xffd700, 1.8); 
             dirLight.position.set(15, 25, 15);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
             
-            const pointLightRose = new THREE.PointLight(0xff69b4, 3.5, 80);
+            const pointLightRose = new THREE.PointLight(0xff69b4, 2.0, 80);
             pointLightRose.position.set(-20, 10, -10);
             scene.add(pointLightRose);
 
-            const centerLight = new THREE.PointLight(0xffaa55, 3.0, 30);
+            const centerLight = new THREE.PointLight(0xffaa55, 1.5, 30);
             centerLight.position.set(0, 8, 0);
             mainGroup.add(centerLight);
 
-            // 后处理
-            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.8, 1.0, 0.15);
+            // --- 辉光克制 (阈值0.85) ---
+            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.5, 0.85);
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // 材质
             const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.3, metalness: 0.6 });
-            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.05, metalness: 1.0 });
+            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.1, metalness: 0.95 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.2, metalness: 0.1 });
             
             const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=256;
@@ -266,17 +261,16 @@
             ctx.strokeStyle='#ffd700'; ctx.lineWidth=5; ctx.strokeRect(15,15,226,226);
             const matPhoto = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide });
 
-            // 几何体
             const sphereGeo = new THREE.SphereGeometry(0.35, 24, 24); 
             const boxGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
             const candyGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 16);
             const photoGeo = new THREE.PlaneGeometry(0.85, 0.85);
             
             const maxCount = CONFIG.count; 
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); // 0
-            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    // 1
-            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  // 2
-            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  // 3
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); 
+            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    
+            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  
+            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  
 
             shapes.meshes.forEach(m => {
                 m.receiveShadow = true; m.castShadow = true;
@@ -285,7 +279,6 @@
             });
         }
 
-        // --- 数据生成逻辑 ---
         function generateShapes() {
             const typeCounts = [0, 0, 0, 0];
             let idx = 0;
@@ -312,10 +305,14 @@
                 if(shapeType === 3) color = new THREE.Color(1,1,1);
                 setInstanceColor(idx, color);
                 
-                const explodeDir = new THREE.Vector3(particleData.cakePos[idx*3], y - 4, particleData.cakePos[idx*3+2]).normalize();
-                particleData.explodeVel[idx*3] = explodeDir.x * CONFIG.explodeSpeed * (0.5 + Math.random());
-                particleData.explodeVel[idx*3+1] = explodeDir.y * CONFIG.explodeSpeed * (0.5 + Math.random());
-                particleData.explodeVel[idx*3+2] = explodeDir.z * CONFIG.explodeSpeed * (0.5 + Math.random());
+                // 【关键】生成限制在画幅内的散开位置 (半径32)
+                const scatterRadius = 32; 
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const sr = Math.cbrt(Math.random()) * scatterRadius; 
+                particleData.scatterPos[idx*3] = sr * Math.sin(phi) * Math.cos(theta);
+                particleData.scatterPos[idx*3+1] = sr * Math.sin(phi) * Math.sin(theta);
+                particleData.scatterPos[idx*3+2] = sr * Math.cos(phi);
             }
 
             const remaining = CONFIG.count - idx;
@@ -328,9 +325,14 @@
 
                 for(let k=0; k<countForThis; k++) {
                     if (idx >= CONFIG.count) break;
-                    particleData.explodeVel[idx*3] = (Math.random()-0.5) * CONFIG.explodeSpeed;
-                    particleData.explodeVel[idx*3+1] = (0.5 + Math.random()) * CONFIG.explodeSpeed * 1.5;
-                    particleData.explodeVel[idx*3+2] = (Math.random()-0.5) * CONFIG.explodeSpeed;
+                    // 蜡烛的散开位置
+                    const scatterRadius = 32;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const sr = Math.cbrt(Math.random()) * scatterRadius;
+                    particleData.scatterPos[idx*3] = sr * Math.sin(phi) * Math.cos(theta);
+                    particleData.scatterPos[idx*3+1] = sr * Math.sin(phi) * Math.sin(theta);
+                    particleData.scatterPos[idx*3+2] = sr * Math.cos(phi);
 
                     if(k < countForThis * 0.6) { 
                         particleData.cakePos[idx*3]=cx+(Math.random()-0.5)*0.3; particleData.cakePos[idx*3+1]=cy+Math.random()*3; particleData.cakePos[idx*3+2]=cz+(Math.random()-0.5)*0.3;
@@ -398,15 +400,23 @@
                 pc.getContext('2d').drawImage(video, 0, 0, pc.width, pc.height);
                 const t = performance.now();
 
-                if (state.step === 0) { 
-                    const face = faceLandmarker.detectForVideo(video, t);
+                const face = faceLandmarker.detectForVideo(video, t);
+                const hand = handLandmarker.detectForVideo(video, t);
+
+                // --- 交互逻辑 (支持双模式触发) ---
+                if (state.step === 0) {
                     if (face.faceBlendshapes.length > 0) {
                         const pucker = face.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
                         if (pucker > CONFIG.blowThreshold) { puckerFrames++; if (puckerFrames > 8) triggerBlowSequence(); } else puckerFrames = 0;
                     }
+                    // 蛋糕状态下张手 -> 直接爆炸
+                    if (hand.landmarks.length > 0) {
+                        const lm = hand.landmarks[0];
+                        const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+                        if (spread > CONFIG.spreadThreshold) state.step = 3; 
+                    }
                 }
-                
-                const hand = handLandmarker.detectForVideo(video, t);
+
                 if (hand.landmarks.length > 0) {
                     const lm = hand.landmarks[0];
                     const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
@@ -421,29 +431,34 @@
 
             const pos = particleData.currentPos;
             const rot = particleData.currentRot;
-            let target = (state.step === 0 || state.step === 1) ? particleData.cakePos : particleData.textPos;
+            
+            // --- 目标选择逻辑 ---
+            let target;
+            if (state.step === 3) target = particleData.scatterPos; // 炸开到限定画幅内
+            else if (state.step === 2) target = particleData.textPos;
+            else target = particleData.cakePos;
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
                 
+                // 状态特有动画
                 if (state.step === 0 && particleData.type[i] === 2) { 
                     pos[i3] += (Math.random()-0.5)*0.1; 
                     particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.05;
                 }
-                
                 if (state.step === 1 && particleData.type[i] === 2) { 
                     pos[i3+1] += 0.2; pos[i3] += Math.sin(time*5+i)*0.05; 
                     rot[i3]+=0.15; rot[i3+2]+=0.15;
                 }
 
-                if (state.step === 3) { // 爆炸
-                    pos[i3] += particleData.explodeVel[i3] * 0.1;
-                    pos[i3+1] += particleData.explodeVel[i3+1] * 0.1;
-                    pos[i3+2] += particleData.explodeVel[i3+2] * 0.1;
-                    rot[i3]+=0.1; rot[i3+1]+=0.1;
-                } 
-                else if (state.step !== 1 || particleData.type[i] !== 2) { // 聚合
-                    const speed = (state.step === 0) ? 0.15 : ((state.step === 2) ? 0.08 : 0.12);
+                if (state.step === 3) { // 散开时的微动
+                     pos[i3] += Math.sin(time + particleData.noise[i]) * 0.05;
+                     pos[i3+1] += Math.cos(time * 0.9 + particleData.noise[i]) * 0.05;
+                }
+
+                // 统一的平滑运动逻辑
+                if (state.step !== 1 || particleData.type[i] !== 2) { 
+                    const speed = (state.step === 3) ? 0.06 : ((state.step === 0) ? 0.15 : 0.08);
                     pos[i3] += (target[i3] - pos[i3]) * speed;
                     pos[i3+1] += (target[i3+1] - pos[i3+1]) * speed;
                     pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
@@ -455,7 +470,7 @@
                     shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
                     
                     let scale = particleData.type[i] === 2 ? 1.6 : (particleData.shapeType[i]===3 ? 1.3 : 1);
-                    if(state.step === 3) scale *= 0.8;
+                    if(state.step === 3) scale *= 0.9;
                     shapes.dummy.scale.set(scale, scale, scale);
                     
                     shapes.dummy.updateMatrix();
