@@ -3,37 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rose Gold Geometric Luxury</title>
+    <title>Rose Gold Celebration</title>
+    <link rel="icon" href="data:;base64,=">
     <style>
-        body { margin: 0; overflow: hidden; background: #050202; font-family: 'Times New Roman', serif; }
+        body { margin: 0; overflow: hidden; background: #050202; font-family: 'Times New Roman', serif; user-select: none; }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
         
         h1 {
             color: #E6C2BF; font-size: 2.8rem; letter-spacing: 0.5rem; text-transform: uppercase;
-            text-shadow: 0 0 40px rgba(183, 110, 121, 0.8); margin-bottom: 15px; 
-            opacity: 0; animation: fadeIn 2s forwards 0.5s;
+            text-shadow: 0 0 50px rgba(183, 110, 121, 0.9); margin-bottom: 15px; 
+            opacity: 0; animation: fadeIn 2s forwards 0.5s; text-align: center;
         }
 
         .hint-container {
             display: flex; align-items: center; gap: 10px;
-            background: rgba(20, 10, 10, 0.7); border: 1px solid rgba(212, 175, 55, 0.4);
-            padding: 10px 25px; border-radius: 50px; backdrop-filter: blur(10px);
+            background: rgba(20, 10, 10, 0.8); border: 1px solid rgba(212, 175, 55, 0.5);
+            padding: 12px 30px; border-radius: 50px; backdrop-filter: blur(10px);
             opacity: 0; animation: fadeIn 2s forwards 1.5s;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: all 0.3s;
         }
-        .hint-text { color: #d4af37; font-size: 1rem; letter-spacing: 1px; }
-        .status-dot { width: 10px; height: 10px; background: #555; border-radius: 50%; transition: all 0.5s; border: 1px solid #222; }
+        .hint-text { color: #d4af37; font-size: 1.1rem; letter-spacing: 1px; font-weight: bold; }
+        .status-dot { width: 12px; height: 12px; background: #555; border-radius: 50%; transition: all 0.5s; border: 2px solid #222; }
         .status-active { background: #0f0; box-shadow: 0 0 15px #0f0; border-color: #0f0; }
 
         #loader { position: fixed; inset: 0; background: #020101; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
-        .circle { width: 70px; height: 70px; border: 3px solid rgba(183, 110, 121, 0.2); border-top: 3px solid #B76E79; border-radius: 50%; animation: spin 1s infinite linear; }
-        .log-text { color: #B76E79; margin-top: 25px; font-size: 14px; letter-spacing: 2px; font-family: monospace; text-transform: uppercase; }
+        .circle { width: 80px; height: 80px; border: 4px solid rgba(183, 110, 121, 0.2); border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s infinite linear; }
+        .log-text { color: #B76E79; margin-top: 25px; font-size: 14px; letter-spacing: 3px; font-family: monospace; text-transform: uppercase; }
 
         #webcam-preview { 
             position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; 
             border: 2px solid rgba(183, 110, 121, 0.5); border-radius: 12px; z-index: 20; 
-            transform: scaleX(-1); opacity: 0.8; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            transform: scaleX(-1); opacity: 0; transition: opacity 0.5s;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
         }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -44,12 +46,12 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Loading 3D Elements...</div>
+        <div class="log-text" id="log">Initializing Engine...</div>
     </div>
 
     <div id="ui-layer">
         <h1 id="title">Grand Celebration</h1>
-        <div class="hint-container">
+        <div class="hint-container" id="hint-box">
             <span id="ai-status" class="status-dot"></span>
             <span class="hint-text" id="guide">正在连接 AI 视觉...</span>
         </div>
@@ -75,90 +77,106 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
+        // --- 核心配置 ---
         const CONFIG = {
-            count: 5500,
+            count: 5500, // 粒子总数
             colors: {
-                rose: new THREE.Color(0xB76E79),
-                gold: new THREE.Color(0xFFD700),
-                ivory: new THREE.Color(0xFFFFF0),
-                flame: new THREE.Color(0xFF4500),
-                smoke: new THREE.Color(0x333333)
+                rose: new THREE.Color(0xB76E79),      // 玫瑰金
+                gold: new THREE.Color(0xFFD700),      // 纯金
+                ivory: new THREE.Color(0xFFFFF0),     // 象牙白
+                flame: new THREE.Color(0xFF4500),     // 火焰红
+                smoke: new THREE.Color(0x222222)      // 烟雾灰
             },
-            blowThreshold: 0.4,
-            spreadThreshold: 0.38
+            blowThreshold: 0.35, // 吹气灵敏度 (越低越灵敏)
+            spreadThreshold: 0.38 // 手势散开灵敏度
         };
 
+        // --- 全局变量 (严格初始化) ---
         let scene, camera, renderer, composer, mainGroup;
         let handLandmarker, faceLandmarker, video;
         let puckerFrames = 0;
-        let state = { step: 0, rotation: 0, aiReady: false };
+        let state = { step: 0, rotation: 0, aiReady: false }; // 0:蛋糕, 1:熄灭, 2:文字, 3:散开
 
+        // 粒子数据结构 (SOA Layout for performance)
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
             currentPos: new Float32Array(CONFIG.count * 3),
             currentRot: new Float32Array(CONFIG.count * 3),
-            type: new Uint8Array(CONFIG.count),
-            shapeType: new Uint8Array(CONFIG.count),
+            type: new Uint8Array(CONFIG.count), // 0:Body, 1:Wick, 2:Flame
+            shapeType: new Uint8Array(CONFIG.count), // 0:Sphere, 1:Box, 2:Candy, 3:Photo
             noise: new Float32Array(CONFIG.count),
             meshMapping: [] 
         };
 
+        // InstancedMesh 管理器
         const shapes = {
             meshes: [],
             dummy: new THREE.Object3D(),
-            materials: []
         };
 
         const logger = document.getElementById('log');
         const guide = document.getElementById('guide');
 
+        // --- 主入口 ---
         async function init() {
             try {
                 logger.innerText = "Creating Luxury Geometry...";
-                initThree();
-                generateShapes();
+                initThree(); // 3D 初始化
+                generateShapes(); // 数据生成
                 
                 logger.innerText = "Starting Vision AI...";
-                await initAI();
+                await initAI(); // AI 初始化
                 
                 state.aiReady = true;
                 document.getElementById('ai-status').classList.add('status-active');
+                document.getElementById('webcam-preview').style.opacity = 0.8;
                 guide.innerText = "😗 请嘟嘴吹灭蜡烛";
                 
             } catch (err) {
-                console.error(err);
+                console.warn("Fallback to Mouse Mode:", err);
                 state.aiReady = false;
-                document.getElementById('ai-status').style.backgroundColor = '#f00';
-                guide.innerText = "🖱️ AI启动失败。点击屏幕吹灭蜡烛";
+                document.getElementById('ai-status').style.backgroundColor = '#ffaa00';
+                guide.innerText = "🖱️ 点击屏幕吹灭蜡烛";
                 setupMouseFallback();
             } finally {
-                setTimeout(() => document.getElementById('loader').style.opacity = 0, 800);
-                setTimeout(() => document.getElementById('loader').remove(), 1800);
+                // 强制移除 Loading，防止卡死
+                setTimeout(() => document.getElementById('loader').style.opacity = 0, 500);
+                setTimeout(() => document.getElementById('loader').remove(), 1500);
                 animate();
             }
         }
 
         function setupMouseFallback() {
             window.addEventListener('click', triggerBlowSequence);
-            window.addEventListener('mousemove', e => state.rotation = (e.clientX/window.innerWidth-0.5)*4);
+            window.addEventListener('mousemove', e => {
+                state.rotation = (e.clientX / window.innerWidth - 0.5) * 4;
+            });
         }
 
+        // --- 交互逻辑 ---
         function triggerBlowSequence() {
             if (state.step === 0) {
-                state.step = 1;
+                state.step = 1; // 进入熄灭状态
+                
+                // 变色逻辑：寻找火焰粒子并变黑
                 for(let i=0; i<CONFIG.count; i++) {
                     if (particleData.type[i] === 2) { 
                         const map = particleData.meshMapping[i];
-                        shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, CONFIG.colors.smoke);
+                        if (shapes.meshes[map.meshIdx]) {
+                            shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, CONFIG.colors.smoke);
+                        }
                     }
                 }
-                shapes.meshes.forEach(m => m.instanceColor.needsUpdate = true);
+                shapes.meshes.forEach(m => {
+                    if(m.instanceColor) m.instanceColor.needsUpdate = true;
+                });
 
+                // 1.8秒后切换到文字
                 setTimeout(() => {
                     state.step = 2;
                     updateTitle("Happy Birthday!");
-                    if(state.aiReady) guide.innerText = "🖐 现在张开手掌：散放粒子";
+                    guide.innerText = state.aiReady ? "🖐 张开手掌：散放粒子" : "🖱️ 移动鼠标观赏";
                 }, 1800);
             }
         }
@@ -168,23 +186,12 @@
             t.style.opacity = 0;
             setTimeout(() => {
                 t.innerText = text;
-                t.style.textShadow = "0 0 50px #FFD700, 0 0 30px #B76E79";
+                t.style.textShadow = "0 0 60px #FFD700, 0 0 30px #B76E79"; // 增强光晕
                 t.style.opacity = 1;
             }, 500);
         }
 
-        function createPhotoTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 256; canvas.height = 256;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#fcefe6'; ctx.fillRect(0,0,256,256); 
-            ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 10; ctx.strokeRect(5,5,246,246); 
-            ctx.fillStyle = '#b76e79'; ctx.font = 'bold 40px "Times New Roman"';
-            ctx.textAlign = 'center'; ctx.fillText('MEMORIES', 128, 120);
-            ctx.font = 'italic 30px serif'; ctx.fillText('Sweet Moments', 128, 160);
-            return new THREE.CanvasTexture(canvas);
-        }
-
+        // --- 3D 场景构建 ---
         function initThree() {
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050202, 0.015);
@@ -198,7 +205,7 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // 主组 (修复报错的关键：在scene创建后立即创建)
+            // 【关键修复】mainGroup 必须在这里初始化
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
@@ -219,33 +226,55 @@
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // 材质
+            // 材质定义
             const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.7, metalness: 0.1 });
             const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.2, metalness: 0.8 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.5, metalness: 0.1 });
             const matPhoto = new THREE.MeshBasicMaterial({ map: createPhotoTexture(), side: THREE.DoubleSide });
 
-            // 几何体
+            // 几何体定义
             const sphereGeo = new THREE.SphereGeometry(0.25, 16, 16);
             const boxGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
             const candyGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 12);
-            const photoGeo = new THREE.PlaneGeometry(0.6, 0.6);
+            const photoGeo = new THREE.PlaneGeometry(0.7, 0.7); // 加大照片尺寸
             
-            // InstancedMesh
-            const maxCount = Math.floor(CONFIG.count / 2); 
+            // InstancedMesh 初始化 (预留足够空间)
+            const maxCount = Math.floor(CONFIG.count * 0.6); // 安全余量
             shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); // 0: Sphere
             shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    // 1: Box
             shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  // 2: Candy
             shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  // 3: Photo
 
+            // 添加到 mainGroup
             shapes.meshes.forEach(m => {
                 m.receiveShadow = true; m.castShadow = true;
                 m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                // 修复：添加到 mainGroup 而不是 scene
-                mainGroup.add(m); 
+                mainGroup.add(m);
             });
         }
 
+        function createPhotoTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // 拍立得风格
+            ctx.fillStyle = '#fff'; ctx.fillRect(0,0,256,256);
+            ctx.fillStyle = '#000'; ctx.fillRect(15,15,226,190); // 照片区域
+            
+            // 模拟照片内容 (渐变)
+            const grad = ctx.createLinearGradient(15,15,241,205);
+            grad.addColorStop(0, '#ff9a9e');
+            grad.addColorStop(1, '#fecfef');
+            ctx.fillStyle = grad; ctx.fillRect(15,15,226,190);
+            
+            ctx.fillStyle = '#333'; ctx.font = 'italic 24px "Times New Roman"';
+            ctx.textAlign = 'center'; ctx.fillText('Beautiful Day', 128, 235);
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 形状生成器 ---
         function generateShapes() {
             const typeCounts = [0, 0, 0, 0];
             let idx = 0;
@@ -255,6 +284,7 @@
             for(; idx < bodyEnd; idx++) {
                 const angle = Math.random() * Math.PI * 2;
                 let r, y;
+                // 双层结构
                 if(Math.random() > 0.4) { r = 9 + Math.random()*2; y = Math.random()*6-4; } 
                 else { r = 6 + Math.random()*1.5; y = Math.random()*5+2.5; }
 
@@ -263,14 +293,16 @@
                 particleData.cakePos[idx*3+2] = Math.sin(angle)*r;
                 particleData.type[idx] = 0;
 
+                // 随机分配形状 (球、方、照片)
                 const shapeRnd = Math.random();
                 let shapeType = shapeRnd > 0.7 ? 0 : (shapeRnd > 0.4 ? 1 : 3);
                 particleData.shapeType[idx] = shapeType;
                 assignMeshMapping(idx, shapeType, typeCounts);
 
+                // 随机分配颜色
                 const colorRnd = Math.random();
                 let color = colorRnd > 0.6 ? CONFIG.colors.rose : (colorRnd > 0.3 ? CONFIG.colors.gold : CONFIG.colors.ivory);
-                if(shapeType === 3) color = new THREE.Color(1,1,1);
+                if(shapeType === 3) color = new THREE.Color(1,1,1); // 照片保持原色
                 setInstanceColor(idx, color);
             }
 
@@ -281,24 +313,25 @@
                 const pPerCandle = Math.floor((CONFIG.count - idx)/candles);
                 for(let k=0; k<pPerCandle; k++) {
                     const ii = idx + k; if(ii >= CONFIG.count) break;
-                    if(k < pPerCandle * 0.6) {
+                    if(k < pPerCandle * 0.6) { // 烛芯
                         particleData.cakePos[ii*3]=cx+(Math.random()-0.5)*0.3; particleData.cakePos[ii*3+1]=cy+Math.random()*3; particleData.cakePos[ii*3+2]=cz+(Math.random()-0.5)*0.3;
-                        particleData.type[ii] = 1; particleData.shapeType[ii] = 2;
+                        particleData.type[ii] = 1; particleData.shapeType[ii] = 2; // Candy
                         assignMeshMapping(ii, 2, typeCounts); setInstanceColor(ii, CONFIG.colors.ivory);
-                    } else {
+                    } else { // 火焰
                         particleData.cakePos[ii*3]=cx+(Math.random()-0.5)*0.4; particleData.cakePos[ii*3+1]=cy+3.5+Math.random()*1.5; particleData.cakePos[ii*3+2]=cz+(Math.random()-0.5)*0.4;
-                        particleData.type[ii] = 2; particleData.shapeType[ii] = 0;
+                        particleData.type[ii] = 2; particleData.shapeType[ii] = 0; // Sphere
                         assignMeshMapping(ii, 0, typeCounts); setInstanceColor(ii, CONFIG.colors.flame);
                     }
                 }
                 idx += pPerCandle;
             }
 
-            // 3. 文字
+            // 3. 文字目标位置
             const cvs = document.createElement('canvas'); cvs.width=700; cvs.height=180;
             const ctx = cvs.getContext('2d'); ctx.font='900 70px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; ctx.fillText('HAPPY BIRTHDAY', 350, 100);
             const data = ctx.getImageData(0,0,700,180).data; const valid = [];
             for(let y=0; y<180; y+=4) for(let x=0; x<700; x+=4) if(data[(y*700+x)*4]>128) valid.push({x:(x-350)*0.14, y:(90-y)*0.14+8});
+            
             for(let i=0; i<CONFIG.count; i++) {
                 const p = valid[i%valid.length];
                 particleData.textPos[i*3] = p.x; particleData.textPos[i*3+1] = p.y; particleData.textPos[i*3+2] = (Math.random()-0.5)*3;
@@ -306,6 +339,7 @@
                 particleData.noise[i] = Math.random()*100;
             }
 
+            // 强制更新一次矩阵
             shapes.meshes.forEach(m => { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; });
         }
 
@@ -314,9 +348,12 @@
         }
         function setInstanceColor(particleIdx, color) {
             const map = particleData.meshMapping[particleIdx];
-            shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, color);
+            if (shapes.meshes[map.meshIdx]) {
+                shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, color);
+            }
         }
 
+        // --- AI 逻辑 ---
         async function initAI() {
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
@@ -333,6 +370,7 @@
             return new Promise(resolve => video.onloadeddata = resolve);
         }
 
+        // --- 渲染循环 ---
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
@@ -342,6 +380,7 @@
                 pc.getContext('2d').drawImage(video, 0, 0, pc.width, pc.height);
                 const t = performance.now();
 
+                // 吹气检测
                 if (state.step === 0) {
                     const face = faceLandmarker.detectForVideo(video, t);
                     if (face.faceBlendshapes.length > 0) {
@@ -349,46 +388,70 @@
                         if (pucker > CONFIG.blowThreshold) { puckerFrames++; if (puckerFrames > 8) triggerBlowSequence(); } else puckerFrames = 0;
                     }
                 }
+                
+                // 手势检测
                 const hand = handLandmarker.detectForVideo(video, t);
                 if (hand.landmarks.length > 0) {
                     const lm = hand.landmarks[0];
                     const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
                     state.rotation = (lm[9].x - 0.5) * 4;
-                    if (state.step >= 2) { state.step = spread > CONFIG.spreadThreshold ? 3 : 2; }
+                    
+                    // 逻辑修复：只要进入文字阶段，手张开(spread > 0.38)就触发散开
+                    if (state.step >= 2) { 
+                        state.step = spread > CONFIG.spreadThreshold ? 3 : 2; 
+                    }
                 }
             }
 
+            // --- 粒子物理 ---
             const pos = particleData.currentPos;
             const rot = particleData.currentRot;
             let target = (state.step <= 1) ? particleData.cakePos : particleData.textPos;
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
+                
+                // 火焰跳动 (Step 0)
                 if (state.step === 0 && particleData.type[i] === 2) {
-                    pos[i3] += (Math.random()-0.5)*0.1; particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.04;
+                    pos[i3] += (Math.random()-0.5)*0.1; 
+                    particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.04;
                 }
+                
+                // 烟雾上飘 (Step 1)
                 if (state.step === 1 && particleData.type[i] === 2) {
-                    pos[i3+1] += 0.15; pos[i3] += Math.sin(time*4+i)*0.04; rot[i3]+=0.1; rot[i3+2]+=0.1;
+                    pos[i3+1] += 0.15; // 快速上升
+                    pos[i3] += Math.sin(time*4+i)*0.04; // 螺旋
+                    rot[i3]+=0.1; rot[i3+2]+=0.1; // 旋转
                 }
+
+                // 散开 (Step 3)
                 if (state.step === 3) {
                     pos[i3] += Math.sin(time + particleData.noise[i]) * 0.15;
                     pos[i3+1] += Math.cos(time + particleData.noise[i]) * 0.15;
                     pos[i3+2] += Math.sin(time*0.7 + particleData.noise[i]) * 0.15;
                     rot[i3]+=0.05; rot[i3+1]+=0.05;
-                } else if (state.step !== 1 || particleData.type[i] !== 2) {
+                } 
+                // 正常聚合 (Step 0, 2)
+                else if (state.step !== 1 || particleData.type[i] !== 2) {
                     const speed = (state.step >= 2) ? 0.08 : 0.12;
                     pos[i3] += (target[i3] - pos[i3]) * speed;
                     pos[i3+1] += (target[i3+1] - pos[i3+1]) * speed;
                     pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
                 }
 
+                // 更新矩阵
                 const map = particleData.meshMapping[i];
-                shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
-                shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
-                const scale = particleData.type[i] === 2 ? 1.5 : (particleData.shapeType[i]===2 ? 0.8 : 1); 
-                shapes.dummy.scale.set(scale, scale, scale);
-                shapes.dummy.updateMatrix();
-                shapes.meshes[map.meshIdx].setMatrixAt(map.instanceIdx, shapes.dummy.matrix);
+                if (shapes.meshes[map.meshIdx]) {
+                    shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
+                    shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
+                    
+                    // 火焰粒子放大
+                    const scale = particleData.type[i] === 2 ? 1.5 : (particleData.shapeType[i]===3 ? 1.2 : 1); 
+                    shapes.dummy.scale.set(scale, scale, scale);
+                    
+                    shapes.dummy.updateMatrix();
+                    shapes.meshes[map.meshIdx].setMatrixAt(map.instanceIdx, shapes.dummy.matrix);
+                }
             }
 
             shapes.meshes.forEach(m => m.instanceMatrix.needsUpdate = true);
@@ -396,10 +459,14 @@
             composer.render();
         }
         
+        // 窗口适配
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+            composer.setSize(window.innerWidth, window.innerHeight);
         });
+
         init();
     </script>
 </body>
