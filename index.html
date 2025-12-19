@@ -27,7 +27,7 @@
         .status-active { background: #0f0; box-shadow: 0 0 15px #0f0; border-color: #0f0; }
 
         #loader { position: fixed; inset: 0; background: #020101; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
-        .circle { width: 70px; height: 70px; border: 3px solid solid rgba(183, 110, 121, 0.2); border-top: 3px solid #B76E79; border-radius: 50%; animation: spin 1s infinite linear; }
+        .circle { width: 70px; height: 70px; border: 3px solid rgba(183, 110, 121, 0.2); border-top: 3px solid #B76E79; border-radius: 50%; animation: spin 1s infinite linear; }
         .log-text { color: #B76E79; margin-top: 25px; font-size: 14px; letter-spacing: 2px; font-family: monospace; text-transform: uppercase; }
 
         #webcam-preview { 
@@ -88,27 +88,25 @@
             spreadThreshold: 0.38
         };
 
-        let scene, camera, renderer, composer;
+        let scene, camera, renderer, composer, mainGroup;
         let handLandmarker, faceLandmarker, video;
         let puckerFrames = 0;
         let state = { step: 0, rotation: 0, aiReady: false };
 
-        // 核心数据结构升级
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
             currentPos: new Float32Array(CONFIG.count * 3),
-            currentRot: new Float32Array(CONFIG.count * 3), // 存储每个粒子的旋转
-            type: new Uint8Array(CONFIG.count), // 0:Body, 1:Wick, 2:Flame
-            shapeType: new Uint8Array(CONFIG.count), // 0:Sphere, 1:Box, 2:Candy, 3:Photo
+            currentRot: new Float32Array(CONFIG.count * 3),
+            type: new Uint8Array(CONFIG.count),
+            shapeType: new Uint8Array(CONFIG.count),
             noise: new Float32Array(CONFIG.count),
-            meshMapping: [] // 映射逻辑粒子到 InstancedMesh 的索引
+            meshMapping: [] 
         };
 
-        // InstancedMesh 管理
         const shapes = {
-            meshes: [], // 存储4种 InstancedMesh
-            dummy: new THREE.Object3D(), // 用于更新矩阵的临时对象
+            meshes: [],
+            dummy: new THREE.Object3D(),
             materials: []
         };
 
@@ -149,9 +147,8 @@
         function triggerBlowSequence() {
             if (state.step === 0) {
                 state.step = 1;
-                // 烟雾变色逻辑需要更新 InstancedMesh 的颜色
                 for(let i=0; i<CONFIG.count; i++) {
-                    if (particleData.type[i] === 2) { // 火焰
+                    if (particleData.type[i] === 2) { 
                         const map = particleData.meshMapping[i];
                         shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, CONFIG.colors.smoke);
                     }
@@ -180,8 +177,8 @@
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#fcefe6'; ctx.fillRect(0,0,256,256); // 象牙白背景
-            ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 10; ctx.strokeRect(5,5,246,246); // 金色边框
+            ctx.fillStyle = '#fcefe6'; ctx.fillRect(0,0,256,256); 
+            ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 10; ctx.strokeRect(5,5,246,246); 
             ctx.fillStyle = '#b76e79'; ctx.font = 'bold 40px "Times New Roman"';
             ctx.textAlign = 'center'; ctx.fillText('MEMORIES', 128, 120);
             ctx.font = 'italic 30px serif'; ctx.fillText('Sweet Moments', 128, 160);
@@ -201,7 +198,11 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // 灯光系统
+            // 主组 (修复报错的关键：在scene创建后立即创建)
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+
+            // 灯光
             const ambient = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambient);
             const dirLight = new THREE.DirectionalLight(0xffd700, 1.5);
@@ -218,36 +219,35 @@
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // --- 定义材质 ---
+            // 材质
             const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.7, metalness: 0.1 });
-            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.2, metalness: 0.8, envMapIntensity: 1.5 });
+            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.2, metalness: 0.8 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.5, metalness: 0.1 });
             const matPhoto = new THREE.MeshBasicMaterial({ map: createPhotoTexture(), side: THREE.DoubleSide });
-            shapes.materials = [matRough, matMetal, matIvory, matPhoto];
 
-            // --- 定义几何体 ---
+            // 几何体
             const sphereGeo = new THREE.SphereGeometry(0.25, 16, 16);
             const boxGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
             const candyGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 12);
             const photoGeo = new THREE.PlaneGeometry(0.6, 0.6);
             
-            // --- 创建 InstancedMesh ---
-            // 预估每种形状的数量 (稍微多一点余量)
-            const maxCount = Math.floor(CONFIG.count / 3); 
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount));
-            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));
-            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));
-            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, CONFIG.count)); // 照片云可能很多
+            // InstancedMesh
+            const maxCount = Math.floor(CONFIG.count / 2); 
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); // 0: Sphere
+            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    // 1: Box
+            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  // 2: Candy
+            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  // 3: Photo
 
             shapes.meshes.forEach(m => {
                 m.receiveShadow = true; m.castShadow = true;
                 m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                scene.add(m);
+                // 修复：添加到 mainGroup 而不是 scene
+                mainGroup.add(m); 
             });
         }
 
         function generateShapes() {
-            const typeCounts = [0, 0, 0, 0]; // Sphere, Box, Candy, Photo
+            const typeCounts = [0, 0, 0, 0];
             let idx = 0;
 
             // 1. 蛋糕主体
@@ -263,40 +263,38 @@
                 particleData.cakePos[idx*3+2] = Math.sin(angle)*r;
                 particleData.type[idx] = 0;
 
-                // 随机分配形状 (球、方、照片)
                 const shapeRnd = Math.random();
                 let shapeType = shapeRnd > 0.7 ? 0 : (shapeRnd > 0.4 ? 1 : 3);
                 particleData.shapeType[idx] = shapeType;
                 assignMeshMapping(idx, shapeType, typeCounts);
 
-                // 分配颜色 (玫瑰、金、象牙)
                 const colorRnd = Math.random();
                 let color = colorRnd > 0.6 ? CONFIG.colors.rose : (colorRnd > 0.3 ? CONFIG.colors.gold : CONFIG.colors.ivory);
-                if(shapeType === 3) color = new THREE.Color(1,1,1); // 照片不染色
+                if(shapeType === 3) color = new THREE.Color(1,1,1);
                 setInstanceColor(idx, color);
             }
 
-            // 2. 蜡烛与火焰 (使用糖果棍和球体)
+            // 2. 蜡烛
             const candles = 7;
             for(let c=0; c<candles; c++) {
                 const angle = (c/candles)*Math.PI*2; const cx = Math.cos(angle)*4; const cz = Math.sin(angle)*4; const cy = 8;
                 const pPerCandle = Math.floor((CONFIG.count - idx)/candles);
                 for(let k=0; k<pPerCandle; k++) {
                     const ii = idx + k; if(ii >= CONFIG.count) break;
-                    if(k < pPerCandle * 0.6) { // 烛芯 (糖果棍)
+                    if(k < pPerCandle * 0.6) {
                         particleData.cakePos[ii*3]=cx+(Math.random()-0.5)*0.3; particleData.cakePos[ii*3+1]=cy+Math.random()*3; particleData.cakePos[ii*3+2]=cz+(Math.random()-0.5)*0.3;
-                        particleData.type[ii] = 1; particleData.shapeType[ii] = 2; // Candy
+                        particleData.type[ii] = 1; particleData.shapeType[ii] = 2;
                         assignMeshMapping(ii, 2, typeCounts); setInstanceColor(ii, CONFIG.colors.ivory);
-                    } else { // 火焰 (大球体)
+                    } else {
                         particleData.cakePos[ii*3]=cx+(Math.random()-0.5)*0.4; particleData.cakePos[ii*3+1]=cy+3.5+Math.random()*1.5; particleData.cakePos[ii*3+2]=cz+(Math.random()-0.5)*0.4;
-                        particleData.type[ii] = 2; particleData.shapeType[ii] = 0; // Sphere
+                        particleData.type[ii] = 2; particleData.shapeType[ii] = 0;
                         assignMeshMapping(ii, 0, typeCounts); setInstanceColor(ii, CONFIG.colors.flame);
                     }
                 }
                 idx += pPerCandle;
             }
 
-            // 3. 文字形状
+            // 3. 文字
             const cvs = document.createElement('canvas'); cvs.width=700; cvs.height=180;
             const ctx = cvs.getContext('2d'); ctx.font='900 70px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; ctx.fillText('HAPPY BIRTHDAY', 350, 100);
             const data = ctx.getImageData(0,0,700,180).data; const valid = [];
@@ -308,7 +306,6 @@
                 particleData.noise[i] = Math.random()*100;
             }
 
-            // 更新所有 Mesh 的初始位置
             shapes.meshes.forEach(m => { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; });
         }
 
@@ -367,7 +364,6 @@
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
-                // 动画逻辑 (火焰、烟雾、散开)
                 if (state.step === 0 && particleData.type[i] === 2) {
                     pos[i3] += (Math.random()-0.5)*0.1; particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.04;
                 }
@@ -386,11 +382,9 @@
                     pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
                 }
 
-                // 更新 InstancedMesh 矩阵
                 const map = particleData.meshMapping[i];
                 shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
                 shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
-                // 火焰粒子稍微大一点
                 const scale = particleData.type[i] === 2 ? 1.5 : (particleData.shapeType[i]===2 ? 0.8 : 1); 
                 shapes.dummy.scale.set(scale, scale, scale);
                 shapes.dummy.updateMatrix();
@@ -402,10 +396,6 @@
             composer.render();
         }
         
-        const mainGroup = new THREE.Group();
-        scene.add(mainGroup);
-        shapes.meshes.forEach(m => mainGroup.add(m)); // 将所有 mesh 放入可旋转组
-
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
