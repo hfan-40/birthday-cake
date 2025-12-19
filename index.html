@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold Cinematic</title>
+    <title>Rose Gold Platinum Celebration</title>
     <link rel="icon" href="data:;base64,=">
     <style>
         body { 
             margin: 0; overflow: hidden; background: #010101; font-family: 'Times New Roman', serif; 
-            user-select: none; -webkit-user-select: none; /* Safari 兼容 */
+            /* 兼容 Safari 的禁止选中 */
+            user-select: none; -webkit-user-select: none; 
         }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
@@ -23,7 +24,8 @@
             display: flex; align-items: center; gap: 10px;
             background: rgba(30, 10, 15, 0.7); border: 1px solid rgba(255, 215, 0, 0.4);
             padding: 15px 40px; border-radius: 50px; 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); /* Safari 兼容 */
+            /* 兼容 Safari 的毛玻璃 */
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             opacity: 0; animation: fadeIn 2s forwards 1.5s;
             box-shadow: 0 0 50px rgba(255, 192, 203, 0.3); transition: all 0.5s;
         }
@@ -50,7 +52,7 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Initializing Cinema Engine...</div>
+        <div class="log-text" id="log">Initializing Engine...</div>
     </div>
 
     <div id="ui-layer">
@@ -79,7 +81,7 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        // 引入环境光组件，解决反射报错
+        // 核心修复：引入 RoomEnvironment 以获得物理级金属反射
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
@@ -103,7 +105,7 @@
         let puckerFrames = 0;
         let state = { step: 0, rotation: 0, aiReady: false }; 
 
-        // --- 安全数据结构 (预填充) ---
+        // --- 安全数据结构 (预填充防止崩溃) ---
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
@@ -113,6 +115,7 @@
             type: new Uint8Array(CONFIG.count), 
             shapeType: new Uint8Array(CONFIG.count),
             noise: new Float32Array(CONFIG.count),
+            // 安全预填充：默认指向第0个 mesh
             meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
         };
 
@@ -154,6 +157,7 @@
             });
         }
 
+        // --- 交互逻辑 ---
         function triggerBlowSequence() {
             if (state.step === 0) {
                 state.step = 1; // 熄灭中
@@ -171,7 +175,7 @@
                 state.step = 0;
                 updateTitle("Princess Celebration", 0); 
                 guide.innerText = state.aiReady ? "✨ 请嘟嘴吹灭蜡烛许愿 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
-                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory);
+                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory); // 复原蜡烛
             }
         }
 
@@ -199,7 +203,7 @@
             }, 500);
         }
 
-        // --- 3D 场景 (兼容性修复) ---
+        // --- 3D 场景 (电影级配置) ---
         function initThree() {
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050205, 0.012);
@@ -220,9 +224,9 @@
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            // [修复] 使用 PMREMGenerator + RoomEnvironment 代替 RenderTargetCube
+            // 【关键修复】使用 PMREMGenerator 替代 RenderTargetCube
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
             // 灯光
             const ambient = new THREE.AmbientLight(0xffcce0, 0.6); 
@@ -248,7 +252,7 @@
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // 材质 (自动使用 scene.environment 进行反射)
+            // 材质
             const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.3, metalness: 0.6 });
             const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.05, metalness: 1.0 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.2, metalness: 0.1 });
@@ -286,7 +290,6 @@
             const typeCounts = [0, 0, 0, 0];
             let idx = 0;
 
-            // 1. 蛋糕主体
             const bodyEnd = Math.floor(CONFIG.count * 0.82);
             for(; idx < bodyEnd; idx++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -315,7 +318,6 @@
                 particleData.explodeVel[idx*3+2] = explodeDir.z * CONFIG.explodeSpeed * (0.5 + Math.random());
             }
 
-            // 2. 蜡烛与火焰
             const remaining = CONFIG.count - idx;
             const candles = 7;
             const perCandle = Math.floor(remaining / candles);
@@ -343,7 +345,6 @@
                 }
             }
 
-            // 3. 文字目标
             const cvs = document.createElement('canvas'); cvs.width=800; cvs.height=200; 
             const ctx = cvs.getContext('2d'); ctx.font='900 80px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; 
             ctx.fillText('HAPPY BIRTHDAY', 400, 120);
