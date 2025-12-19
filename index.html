@@ -3,41 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rose Gold Cinematic Luxury</title>
+    <title>Rose Gold Cinematic</title>
     <link rel="icon" href="data:;base64,=">
     <style>
-        body { margin: 0; overflow: hidden; background: #020101; font-family: 'Times New Roman', serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #010101; font-family: 'Times New Roman', serif; user-select: none; }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
         
         h1 {
-            color: #FFD1DC; /* 更少女感的粉色 */
-            font-size: 3rem; letter-spacing: 0.5rem; text-transform: uppercase;
-            text-shadow: 0 0 50px rgba(255, 182, 193, 1), 0 0 100px rgba(255, 215, 0, 0.8); /* 强烈的粉金光晕 */
+            color: #FFD1DC; font-size: 3.5rem; letter-spacing: 0.5rem; text-transform: uppercase;
+            text-shadow: 0 0 60px rgba(255, 182, 193, 0.8), 0 0 100px rgba(255, 215, 0, 0.6);
             margin-bottom: 15px; opacity: 0; animation: fadeIn 2s forwards 0.5s; text-align: center;
         }
 
         .hint-container {
             display: flex; align-items: center; gap: 10px;
-            background: rgba(40, 20, 25, 0.8); border: 2px solid rgba(255, 215, 0, 0.6);
-            padding: 15px 35px; border-radius: 50px; backdrop-filter: blur(20px);
+            background: rgba(30, 10, 15, 0.7); border: 1px solid rgba(255, 215, 0, 0.4);
+            padding: 15px 40px; border-radius: 50px; backdrop-filter: blur(20px);
             opacity: 0; animation: fadeIn 2s forwards 1.5s;
-            box-shadow: 0 0 40px rgba(255, 192, 203, 0.4); /* 粉色辉光容器 */
-            transition: all 0.3s;
+            box-shadow: 0 0 50px rgba(255, 192, 203, 0.3); transition: all 0.5s;
         }
-        .hint-text { color: #FFD700; font-size: 1.2rem; letter-spacing: 1px; font-weight: 800; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
-        .status-dot { width: 14px; height: 14px; background: #ff0000; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 10px #ff0000; }
-        .status-active { background: #00ff00; box-shadow: 0 0 20px #00ff00; border-color: #ccffcc; }
+        .hint-text { color: #FFD700; font-size: 1.1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        .status-dot { width: 12px; height: 12px; background: #ff3333; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 15px #ff0000; }
+        .status-active { background: #00ff00; box-shadow: 0 0 25px #00ff00; border-color: #ccffcc; }
 
-        #loader { position: fixed; inset: 0; background: #020101; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
-        .circle { width: 100px; height: 100px; border: 5px solid rgba(255, 182, 193, 0.3); border-top: 5px solid #FFD700; border-radius: 50%; animation: spin 0.8s infinite linear; box-shadow: 0 0 30px rgba(255,215,0,0.5); }
-        .log-text { color: #FFD1DC; margin-top: 30px; font-size: 16px; letter-spacing: 4px; font-family: monospace; text-transform: uppercase; text-shadow: 0 0 20px rgba(255,182,193,0.8); }
+        #loader { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; }
+        .circle { width: 120px; height: 120px; border: 4px solid rgba(255, 182, 193, 0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 1s infinite linear; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
+        .log-text { color: #FFD1DC; margin-top: 30px; font-size: 14px; letter-spacing: 4px; font-family: monospace; text-transform: uppercase; }
 
         #webcam-preview { 
             position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; 
-            border: 3px solid rgba(255, 215, 0, 0.6); border-radius: 15px; z-index: 20; 
+            border: 2px solid rgba(255, 215, 0, 0.5); border-radius: 12px; z-index: 20; 
             transform: scaleX(-1); opacity: 0; transition: opacity 0.5s;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -48,7 +46,7 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Loading Luxury Engine...</div>
+        <div class="log-text" id="log">Initializing Cinema Engine...</div>
     </div>
 
     <div id="ui-layer">
@@ -77,21 +75,23 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        // 关键修复：使用 RoomEnvironment 代替旧版 API
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 配置中心 (调整为更亮、更粉、更金) ---
+        // --- 电影级参数配置 ---
         const CONFIG = {
-            count: 3200, // 稍微增加一点密度
+            count: 3200, 
             colors: {
-                rose: new THREE.Color(0xFFB7C5).multiplyScalar(1.2), // 更亮更粉的玫瑰金
-                gold: new THREE.Color(0xFFD700).multiplyScalar(1.5), // 极其耀眼的金色
-                ivory: new THREE.Color(0xFFFFF0).multiplyScalar(1.1), // 亮象牙白
-                flame: new THREE.Color(0xFF5500).multiplyScalar(2.0), // 高亮火焰
-                smoke: new THREE.Color(0x444444)
+                rose: new THREE.Color(0xFFB7C5).multiplyScalar(1.3), // 提亮玫瑰金
+                gold: new THREE.Color(0xFFD700).multiplyScalar(1.8), // 强力金属金
+                ivory: new THREE.Color(0xFFFFF0).multiplyScalar(1.2),
+                flame: new THREE.Color(0xFF5500).multiplyScalar(2.5), // 炽热火焰
+                smoke: new THREE.Color(0x333333)
             },
             blowThreshold: 0.35, 
-            spreadThreshold: 0.4, // 稍微提高散开阈值，防止误触
-            explodeSpeed: 12.0 // 爆炸速度
+            spreadThreshold: 0.4, 
+            explodeSpeed: 15.0 // 强烈的爆炸速度
         };
 
         let scene, camera, renderer, composer, mainGroup;
@@ -99,17 +99,17 @@
         let puckerFrames = 0;
         let state = { step: 0, rotation: 0, aiReady: false }; 
 
-        // --- 数据结构 (包含安全预填充) ---
+        // --- 安全数据结构 ---
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
             currentPos: new Float32Array(CONFIG.count * 3),
             currentRot: new Float32Array(CONFIG.count * 3),
-            // 新增：爆炸速度向量
             explodeVel: new Float32Array(CONFIG.count * 3),
             type: new Uint8Array(CONFIG.count), 
             shapeType: new Uint8Array(CONFIG.count),
             noise: new Float32Array(CONFIG.count),
+            // 预填充防止 undefined
             meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
         };
 
@@ -155,7 +155,7 @@
         function triggerBlowSequence() {
             if (state.step === 0) {
                 state.step = 1; // 熄灭中
-                setCandleColor(CONFIG.colors.smoke); // 变烟雾色
+                setCandleColor(CONFIG.colors.smoke); // 变烟雾
                 setTimeout(() => {
                     state.step = 2; // 变成文字
                     updateTitle("Happy Birthday!", 1);
@@ -164,25 +164,23 @@
             }
         }
 
-        // 新增：重置回蛋糕状态 (针对问题三)
+        // 重置回蛋糕 (闭环逻辑)
         function resetToCake() {
             if (state.step !== 0) {
                 state.step = 0;
-                updateTitle("Princess Celebration", 0); // 隐藏祝福语
+                updateTitle("Princess Celebration", 0); 
                 guide.innerText = state.aiReady ? "✨ 请嘟嘴吹灭蜡烛许愿 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
-                // 强制重新点亮蜡烛
-                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory);
+                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory); // 重置颜色
             }
         }
 
-        // 辅助函数：设置蜡烛颜色
         function setCandleColor(flameColor, wickColor) {
             for(let i=0; i<CONFIG.count; i++) {
                 const map = particleData.meshMapping[i];
                 if (map && shapes.meshes[map.meshIdx]) {
-                    if (particleData.type[i] === 2) { // Flame
+                    if (particleData.type[i] === 2) { 
                          shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, flameColor);
-                    } else if (wickColor && particleData.type[i] === 1) { // Wick (可选重置)
+                    } else if (wickColor && particleData.type[i] === 1) { 
                          shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, wickColor);
                     }
                 }
@@ -190,77 +188,69 @@
             shapes.meshes.forEach(m => { if(m.instanceColor) m.instanceColor.needsUpdate = true; });
         }
 
-
         function updateTitle(text, opacity) {
             const t = document.getElementById('title');
             t.style.opacity = 0;
             setTimeout(() => {
                 t.innerText = text;
-                // 针对问题一：更华丽的文字光晕
+                // 更华丽的文字光晕
                 t.style.textShadow = opacity ? "0 0 60px #FFD700, 0 0 100px #FF69B4, 0 0 30px #fff" : "none";
                 t.style.opacity = opacity;
             }, 500);
         }
 
-        // --- Three.js 场景构建 (核心视觉升级) ---
+        // --- 3D 场景 (含环境光修复) ---
         function initThree() {
             scene = new THREE.Scene();
-            // 更深邃、带点粉紫色的背景雾
-            scene.fog = new THREE.FogExp2(0x1a0510, 0.012);
+            scene.fog = new THREE.FogExp2(0x050205, 0.012); // 深粉紫背景雾
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 6, 55); // 稍微拉远一点视角
+            camera.position.set(0, 6, 55);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 更柔和的阴影
-            // 开启物理光照计算
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.physicallyCorrectLights = true;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
+            renderer.toneMappingExposure = 1.3;
             document.body.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            // --- 灯光系统升级 (针对问题一：金碧辉煌) ---
-            const ambient = new THREE.AmbientLight(0xffcce0, 0.6); // 暖粉色环境光
+            // [修复] 使用 PMREMGenerator 生成真实环境光反射 (关键！)
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+
+            // 灯光
+            const ambient = new THREE.AmbientLight(0xffcce0, 0.6); 
             scene.add(ambient);
             
-            // 主光源：金色强光
             const dirLight = new THREE.DirectionalLight(0xffd700, 4.0);
             dirLight.position.set(15, 25, 15);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
             
-            // 补光：玫瑰色侧光
             const pointLightRose = new THREE.PointLight(0xff69b4, 3.5, 80);
             pointLightRose.position.set(-20, 10, -10);
             scene.add(pointLightRose);
 
-            // 新增：蛋糕中心烛光补光 (照亮蛋糕体)
             const centerLight = new THREE.PointLight(0xffaa55, 3.0, 30);
             centerLight.position.set(0, 8, 0);
             mainGroup.add(centerLight);
 
-            // --- 后处理 (针对问题一：电影感辉光) ---
-            // 参数极其激进：阈值极低，强度极高，半径大
+            // 电影感辉光
             const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.8, 1.0, 0.15);
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // --- 材质升级 (针对问题一：高级感) ---
-            // 创建一个虚拟环境纹理用于反射 (简易版，无需外部文件)
-            const envMap = new THREE.RenderTargetCube(256, 256);
-            // 玫瑰金：极度光滑，带粉色反射
-            const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.3, metalness: 0.6, envMap: envMap.texture });
-            // 金属金：镜面级别，金碧辉煌
-            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.05, metalness: 1.0, envMap: envMap.texture, envMapIntensity: 1.5 });
-            // 象牙白：抛光陶瓷感
+            // 材质
+            const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.3, metalness: 0.6 });
+            const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.05, metalness: 1.0 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.2, metalness: 0.1 });
             
             const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=256;
@@ -273,7 +263,7 @@
             const matPhoto = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide });
 
             // 几何体
-            const sphereGeo = new THREE.SphereGeometry(0.35, 24, 24); // 提高分段数更圆润
+            const sphereGeo = new THREE.SphereGeometry(0.35, 24, 24); 
             const boxGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
             const candyGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 16);
             const photoGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -315,12 +305,12 @@
                 assignMeshMapping(idx, shapeType, typeCounts);
 
                 const colorRnd = Math.random();
-                // 调整颜色分配比例，更多金色和玫瑰色
+                // 调整颜色权重
                 let color = colorRnd > 0.5 ? CONFIG.colors.rose : (colorRnd > 0.2 ? CONFIG.colors.gold : CONFIG.colors.ivory);
                 if(shapeType === 3) color = new THREE.Color(1,1,1);
                 setInstanceColor(idx, color);
                 
-                // 针对问题二：预计算爆炸速度向量 (从中心向外)
+                // 爆炸向量
                 const explodeDir = new THREE.Vector3(particleData.cakePos[idx*3], y - 4, particleData.cakePos[idx*3+2]).normalize();
                 particleData.explodeVel[idx*3] = explodeDir.x * CONFIG.explodeSpeed * (0.5 + Math.random());
                 particleData.explodeVel[idx*3+1] = explodeDir.y * CONFIG.explodeSpeed * (0.5 + Math.random());
@@ -338,16 +328,15 @@
 
                 for(let k=0; k<countForThis; k++) {
                     if (idx >= CONFIG.count) break;
-                    // 针对问题二：蜡烛的爆炸速度向上为主
                     particleData.explodeVel[idx*3] = (Math.random()-0.5) * CONFIG.explodeSpeed;
                     particleData.explodeVel[idx*3+1] = (0.5 + Math.random()) * CONFIG.explodeSpeed * 1.5;
                     particleData.explodeVel[idx*3+2] = (Math.random()-0.5) * CONFIG.explodeSpeed;
 
-                    if(k < countForThis * 0.6) { // 烛芯
+                    if(k < countForThis * 0.6) { 
                         particleData.cakePos[idx*3]=cx+(Math.random()-0.5)*0.3; particleData.cakePos[idx*3+1]=cy+Math.random()*3; particleData.cakePos[idx*3+2]=cz+(Math.random()-0.5)*0.3;
                         particleData.type[idx] = 1; particleData.shapeType[idx] = 2; 
                         assignMeshMapping(idx, 2, typeCounts); setInstanceColor(idx, CONFIG.colors.ivory);
-                    } else { // 火焰
+                    } else { 
                         particleData.cakePos[idx*3]=cx+(Math.random()-0.5)*0.4; particleData.cakePos[idx*3+1]=cy+3.5+Math.random()*1.5; particleData.cakePos[idx*3+2]=cz+(Math.random()-0.5)*0.4;
                         particleData.type[idx] = 2; particleData.shapeType[idx] = 0; 
                         assignMeshMapping(idx, 0, typeCounts); setInstanceColor(idx, CONFIG.colors.flame);
@@ -357,7 +346,7 @@
             }
 
             // 3. 文字目标
-            const cvs = document.createElement('canvas'); cvs.width=800; cvs.height=200; // 加大画布
+            const cvs = document.createElement('canvas'); cvs.width=800; cvs.height=200; 
             const ctx = cvs.getContext('2d'); ctx.font='900 80px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; 
             ctx.fillText('HAPPY BIRTHDAY', 400, 120);
             const data = ctx.getImageData(0,0,800,200).data; const valid = [];
@@ -410,7 +399,7 @@
                 pc.getContext('2d').drawImage(video, 0, 0, pc.width, pc.height);
                 const t = performance.now();
 
-                if (state.step === 0) { // 吹气检测
+                if (state.step === 0) { 
                     const face = faceLandmarker.detectForVideo(video, t);
                     if (face.faceBlendshapes.length > 0) {
                         const pucker = face.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
@@ -418,71 +407,56 @@
                     }
                 }
                 
-                // 手势检测 (核心逻辑修改针对问题三)
                 const hand = handLandmarker.detectForVideo(video, t);
                 if (hand.landmarks.length > 0) {
                     const lm = hand.landmarks[0];
                     const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                    state.rotation = (lm[9].x - 0.5) * 5; // 加快旋转灵敏度
+                    state.rotation = (lm[9].x - 0.5) * 5; 
                     
                     if (state.step >= 2) { 
-                        // 如果张开，进入爆炸状态(3)
-                        if (spread > CONFIG.spreadThreshold) {
-                            state.step = 3;
-                        } 
-                        // 针对问题三：如果合拢，且当前是爆炸状态，则重置回蛋糕(0)
-                        else if (state.step === 3 && spread <= CONFIG.spreadThreshold) {
-                            resetToCake();
-                        }
-                        // 如果是文字状态且合拢，保持文字状态(2)
+                        if (spread > CONFIG.spreadThreshold) state.step = 3;
+                        // 合拢时重置回蛋糕
+                        else if (state.step === 3 && spread <= CONFIG.spreadThreshold) resetToCake();
                     }
                 }
             }
 
             const pos = particleData.currentPos;
             const rot = particleData.currentRot;
-            // 针对问题三：目标选择逻辑更新
             let target = (state.step === 0 || state.step === 1) ? particleData.cakePos : particleData.textPos;
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
                 
-                // 动画逻辑
-                if (state.step === 0 && particleData.type[i] === 2) { // 火焰跳动
+                if (state.step === 0 && particleData.type[i] === 2) { 
                     pos[i3] += (Math.random()-0.5)*0.1; 
                     particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.05;
                 }
                 
-                if (state.step === 1 && particleData.type[i] === 2) { // 烟雾上飘
+                if (state.step === 1 && particleData.type[i] === 2) { 
                     pos[i3+1] += 0.2; pos[i3] += Math.sin(time*5+i)*0.05; 
                     rot[i3]+=0.15; rot[i3+2]+=0.15;
                 }
 
-                // 针对问题二：爆炸逻辑 (使用预计算的速度向量)
-                if (state.step === 3) {
+                if (state.step === 3) { // 爆炸
                     pos[i3] += particleData.explodeVel[i3] * 0.1;
                     pos[i3+1] += particleData.explodeVel[i3+1] * 0.1;
                     pos[i3+2] += particleData.explodeVel[i3+2] * 0.1;
                     rot[i3]+=0.1; rot[i3+1]+=0.1;
                 } 
-                // 聚合逻辑 (Step 0, 1, 2)
-                else if (state.step !== 1 || particleData.type[i] !== 2) {
-                    // 回归蛋糕时速度加快
+                else if (state.step !== 1 || particleData.type[i] !== 2) { // 聚合
                     const speed = (state.step === 0) ? 0.15 : ((state.step === 2) ? 0.08 : 0.12);
                     pos[i3] += (target[i3] - pos[i3]) * speed;
                     pos[i3+1] += (target[i3+1] - pos[i3+1]) * speed;
                     pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
                 }
 
-                // 更新 InstancedMesh
                 const map = particleData.meshMapping[i];
                 if (map && shapes.meshes[map.meshIdx]) {
                     shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
                     shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
                     
-                    // 火焰和照片稍微大一点
                     let scale = particleData.type[i] === 2 ? 1.6 : (particleData.shapeType[i]===3 ? 1.3 : 1);
-                    // 爆炸时稍微缩小
                     if(state.step === 3) scale *= 0.8;
                     shapes.dummy.scale.set(scale, scale, scale);
                     
@@ -493,7 +467,6 @@
 
             shapes.meshes.forEach(m => m.instanceMatrix.needsUpdate = true);
             if(mainGroup) mainGroup.rotation.y = THREE.MathUtils.lerp(mainGroup.rotation.y, state.rotation, 0.05);
-            // 缓慢自转增加动感
             if(mainGroup && !state.aiReady) mainGroup.rotation.y += 0.002;
 
             composer.render();
