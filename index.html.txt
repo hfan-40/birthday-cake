@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury Rose Gold Celebration - Final Pro</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #fcf8f2; font-family: 'Times New Roman', serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: center; padding-top: 40px; }
+        h1 { color: #d4af37; font-size: 36px; letter-spacing: 4px; text-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 0; }
+        #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #d4af37; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #webcam-preview { position: absolute; bottom: 20px; right: 20px; width: 140px; height: 105px; border: 3px solid #d4af37; border-radius: 12px; z-index: 20; background: #000; transform: scaleX(-1); }
+        .hint { color: #d4af37; font-size: 14px; margin-top: 15px; letter-spacing: 2px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="hint" id="status">正在定制奢华庆典...</div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>Grand Celebration</h1>
+        <div class="hint">手势：张开=散放惊喜 | 握拳=聚合祝福</div>
+    </div>
+
+    <canvas id="webcam-preview"></canvas>
+    <div id="canvas-container"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+        let scene, camera, renderer, mainGroup, cakeElements = [];
+        let handLandmarker, video, lastVideoTime = -1;
+        let mode = 'CAKE';
+
+        async function init() {
+            setupScene();
+            createLuxCake();
+            setupLights();
+            
+            try {
+                await initAI();
+            } catch (err) {
+                console.warn("AI Mode Disabled: Mouse control enabled.");
+            }
+
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loader').style.display = 'none';
+                animate();
+            }, 500);
+        }
+
+        function setupScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfcf8f2);
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 12, 35);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+        }
+
+        function setupLights() {
+            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+            const spot = new THREE.SpotLight(0xffffff, 150);
+            spot.position.set(10, 30, 15);
+            scene.add(spot);
+        }
+
+        function createLuxCake() {
+            const ivory = new THREE.MeshStandardMaterial({ color: 0xfffff0, roughness: 0.1 });
+            const rose = new THREE.MeshStandardMaterial({ color: 0xffb7c5, roughness: 0.2 });
+            const gold = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.1 });
+
+            // 底层蛋糕
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 7, 64), ivory);
+            base.userData.home = new THREE.Vector3(0, -3.5, 0);
+            mainGroup.add(base); cakeElements.push(base);
+
+            // 顶层蛋糕
+            const top = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 6, 64), rose);
+            top.userData.home = new THREE.Vector3(0, 3, 0);
+            mainGroup.add(top); cakeElements.push(top);
+
+            // 丝滑奶油流心裙边 (Drips)
+            for(let i=0; i<40; i++) {
+                const dripHeight = 1.5 + Math.sin(i * 0.8) * 1.0;
+                const drip = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.1, dripHeight), rose);
+                const angle = (i/40) * Math.PI * 2;
+                drip.userData.home = new THREE.Vector3(Math.cos(angle)*6.6, 3.5 - dripHeight/2, Math.sin(angle)*6.6);
+                mainGroup.add(drip); cakeElements.push(drip);
+            }
+
+            // 立体插牌
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, 512, 0);
+            grad.addColorStop(0, '#d4af37'); grad.addColorStop(0.5, '#fff'); grad.addColorStop(1, '#d4af37');
+            ctx.fillStyle = grad; ctx.font = 'bold 60px Georgia'; ctx.textAlign = 'center';
+            ctx.fillText('Happy Birthday', 256, 80);
+            
+            const sign = new THREE.Mesh(
+                new THREE.PlaneGeometry(8, 2),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true })
+            );
+            sign.userData.home = new THREE.Vector3(0, 8, 0);
+            mainGroup.add(sign); cakeElements.push(sign);
+        }
+
+        async function initAI() {
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: { 
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                    delegate: "GPU" 
+                },
+                runningMode: "VIDEO", numHands: 1
+            });
+            video = document.getElementById('webcam-preview');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream; video.play();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (handLandmarker && video && video.readyState >= 2) {
+                if (video.currentTime !== lastVideoTime) {
+                    const result = handLandmarker.detectForVideo(video, performance.now());
+                    if (result.landmarks.length > 0) {
+                        const lm = result.landmarks[0];
+                        const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+                        mode = (spread > 0.4) ? 'SCATTER' : 'CAKE';
+                        mainGroup.rotation.y = THREE.MathUtils.lerp(mainGroup.rotation.y, (lm[9].x - 0.5) * 4, 0.1);
+                    }
+                    lastVideoTime = video.currentTime;
+                }
+            } else {
+                mainGroup.rotation.y += 0.01;
+            }
+
+            cakeElements.forEach(el => {
+                const target = (mode === 'CAKE') ? el.userData.home : el.userData.home.clone().multiplyScalar(2.5).add(new THREE.Vector3(0,10,0));
+                el.position.lerp(target, 0.1);
+            });
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
+    </script>
+</body>
+</html>
