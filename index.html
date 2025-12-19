@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold Perfect</title>
+    <title>Rose Gold Masterpiece</title>
     <link rel="icon" href="data:;base64,=">
     <style>
         body { 
@@ -14,26 +14,26 @@
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
         
         h1 {
-            color: #FFD1DC; font-size: 3.5rem; letter-spacing: 0.5rem; text-transform: uppercase;
-            /* 保持柔和的高级光感 */
-            text-shadow: 0 0 20px rgba(255, 182, 193, 0.5), 0 0 40px rgba(255, 215, 0, 0.3);
+            color: #FFD1DC; font-size: 3.2rem; letter-spacing: 0.3rem; text-transform: uppercase;
+            /* 柔和的高级光感，不刺眼 */
+            text-shadow: 0 0 20px rgba(255, 182, 193, 0.4), 0 0 40px rgba(255, 215, 0, 0.2);
             margin-bottom: 15px; opacity: 0; animation: fadeIn 2s forwards 0.5s; text-align: center;
         }
 
         .hint-container {
             display: flex; align-items: center; gap: 10px;
             background: rgba(30, 10, 15, 0.6); border: 1px solid rgba(255, 215, 0, 0.3);
-            padding: 15px 40px; border-radius: 50px; 
+            padding: 12px 35px; border-radius: 50px; 
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             opacity: 0; animation: fadeIn 2s forwards 1.5s;
-            box-shadow: 0 0 30px rgba(255, 192, 203, 0.2); transition: all 0.5s;
+            box-shadow: 0 0 30px rgba(255, 192, 203, 0.15); transition: all 0.5s;
         }
-        .hint-text { color: #FFD700; font-size: 1.1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
-        .status-dot { width: 12px; height: 12px; background: #ff3333; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 10px #ff0000; }
+        .hint-text { color: #FFD700; font-size: 1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
+        .status-dot { width: 10px; height: 10px; background: #ff3333; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 10px #ff0000; }
         .status-active { background: #00ff00; box-shadow: 0 0 15px #00ff00; border-color: #ccffcc; }
 
         #loader { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; }
-        .circle { width: 120px; height: 120px; border: 3px solid rgba(255, 182, 193, 0.2); border-top: 3px solid #FFD700; border-radius: 50%; animation: spin 1s infinite linear; }
+        .circle { width: 100px; height: 100px; border: 3px solid rgba(255, 182, 193, 0.2); border-top: 3px solid #FFD700; border-radius: 50%; animation: spin 1s infinite linear; }
         .log-text { color: #FFD1DC; margin-top: 30px; font-size: 14px; letter-spacing: 4px; font-family: monospace; text-transform: uppercase; }
 
         #webcam-preview { 
@@ -51,7 +51,7 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Final Polishing...</div>
+        <div class="log-text" id="log">Perfecting Visuals...</div>
     </div>
 
     <div id="ui-layer">
@@ -83,14 +83,15 @@
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 最终平衡参数 ---
+        // --- 最终调优参数 ---
         const CONFIG = {
             count: 3200, 
             colors: {
-                rose: new THREE.Color(0xB76E79), 
+                // 调整为更高级、有光泽的粉色
+                rose: new THREE.Color(0xFF8FA3), 
                 gold: new THREE.Color(0xFFD700),
-                ivory: new THREE.Color(0xFFFFF0),
-                flame: new THREE.Color(0xFF4500),
+                ivory: new THREE.Color(0xFFFFFA),
+                flame: new THREE.Color(0xFF4500), 
                 smoke: new THREE.Color(0x333333)
             },
             blowThreshold: 0.35, 
@@ -102,18 +103,16 @@
         let puckerFrames = 0;
         let state = { step: 0, rotation: 0, aiReady: false }; 
 
-        // --- 数据结构 (含 scatterPos 用于画幅限制) ---
+        // 数据结构
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
-            // 【关键】限制在画幅内的散开位置
             scatterPos: new Float32Array(CONFIG.count * 3), 
             currentPos: new Float32Array(CONFIG.count * 3),
             currentRot: new Float32Array(CONFIG.count * 3),
             type: new Uint8Array(CONFIG.count), 
             shapeType: new Uint8Array(CONFIG.count),
             noise: new Float32Array(CONFIG.count),
-            // 预填充防止报错
             meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
         };
 
@@ -156,12 +155,12 @@
 
         function triggerBlowSequence() {
             if (state.step === 0) {
-                state.step = 1; // 熄灭中
+                state.step = 1; 
                 setCandleColor(CONFIG.colors.smoke);
                 setTimeout(() => {
-                    state.step = 2; // 变成文字
+                    state.step = 2; 
                     updateTitle("Happy Birthday!", 1);
-                    guide.innerText = state.aiReady ? "👐 张开手掌：粒子炸裂" : "🖱️ 移动鼠标观赏";
+                    guide.innerText = state.aiReady ? "👐 张开手掌：释放魔法炸裂" : "🖱️ 移动鼠标观赏";
                 }, 1800);
             }
         }
@@ -194,8 +193,7 @@
             t.style.opacity = 0;
             setTimeout(() => {
                 t.innerText = text;
-                // 平衡后的文字光晕
-                t.style.textShadow = opacity ? "0 0 30px #FFD700, 0 0 50px #FF69B4, 0 0 20px #fff" : "none";
+                t.style.textShadow = opacity ? "0 0 30px #FFD700, 0 0 50px #FF69B4" : "none";
                 t.style.opacity = opacity;
             }, 500);
         }
@@ -214,21 +212,20 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.physicallyCorrectLights = true;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.0; // 舒适的曝光
+            renderer.toneMappingExposure = 1.0; 
             document.body.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            // 环境光反射
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
-            // --- 灯光系统 (平衡版) ---
+            // --- 灯光系统 (防止过曝) ---
             const ambient = new THREE.AmbientLight(0xffcce0, 0.4); 
             scene.add(ambient);
             
-            const dirLight = new THREE.DirectionalLight(0xffd700, 1.8); 
+            const dirLight = new THREE.DirectionalLight(0xffd700, 2.0); 
             dirLight.position.set(15, 25, 15);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
@@ -238,19 +235,29 @@
             pointLightRose.position.set(-20, 10, -10);
             scene.add(pointLightRose);
 
+            // 烛光补光
             const centerLight = new THREE.PointLight(0xffaa55, 1.5, 30);
             centerLight.position.set(0, 8, 0);
             mainGroup.add(centerLight);
 
-            // --- 辉光克制 (阈值0.85) ---
-            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.5, 0.85);
+            // --- 辉光参数 (克制而高级) ---
+            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.6, 0.8);
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.3, metalness: 0.6 });
+            // --- 材质定义 (质感关键) ---
+            const matRough = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.25, metalness: 0.5 });
             const matMetal = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.1, metalness: 0.95 });
             const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.2, metalness: 0.1 });
+            // 针对问题三：真实的火焰材质 (高自发光)
+            const matFlame = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.colors.flame, 
+                emissive: CONFIG.colors.flame, 
+                emissiveIntensity: 3.0, // 显著提高亮度
+                roughness: 0.0, 
+                metalness: 0.0 
+            });
             
             const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=256;
             const ctx = canvas.getContext('2d');
@@ -261,16 +268,18 @@
             ctx.strokeStyle='#ffd700'; ctx.lineWidth=5; ctx.strokeRect(15,15,226,226);
             const matPhoto = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide });
 
+            // 几何体
             const sphereGeo = new THREE.SphereGeometry(0.35, 24, 24); 
             const boxGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
             const candyGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 16);
             const photoGeo = new THREE.PlaneGeometry(0.85, 0.85);
             
             const maxCount = CONFIG.count; 
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); 
-            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    
-            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  
-            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRough, maxCount)); // 0: 球(粉)
+            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matMetal, maxCount));    // 1: 方(金)
+            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount));  // 2: 棍(白)
+            shapes.meshes.push(new THREE.InstancedMesh(photoGeo, matPhoto, maxCount));  // 3: 照片
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matFlame, maxCount)); // 4: 火焰(亮)
 
             shapes.meshes.forEach(m => {
                 m.receiveShadow = true; m.castShadow = true;
@@ -280,7 +289,7 @@
         }
 
         function generateShapes() {
-            const typeCounts = [0, 0, 0, 0];
+            const typeCounts = [0, 0, 0, 0, 0];
             let idx = 0;
 
             const bodyEnd = Math.floor(CONFIG.count * 0.82);
@@ -305,7 +314,7 @@
                 if(shapeType === 3) color = new THREE.Color(1,1,1);
                 setInstanceColor(idx, color);
                 
-                // 【关键】生成限制在画幅内的散开位置 (半径32)
+                // 散开范围限制 (半径32)
                 const scatterRadius = 32; 
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(2 * Math.random() - 1);
@@ -325,7 +334,7 @@
 
                 for(let k=0; k<countForThis; k++) {
                     if (idx >= CONFIG.count) break;
-                    // 蜡烛的散开位置
+                    
                     const scatterRadius = 32;
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos(2 * Math.random() - 1);
@@ -341,17 +350,19 @@
                     } else { 
                         particleData.cakePos[idx*3]=cx+(Math.random()-0.5)*0.4; particleData.cakePos[idx*3+1]=cy+3.5+Math.random()*1.5; particleData.cakePos[idx*3+2]=cz+(Math.random()-0.5)*0.4;
                         particleData.type[idx] = 2; particleData.shapeType[idx] = 0; 
-                        assignMeshMapping(idx, 0, typeCounts); setInstanceColor(idx, CONFIG.colors.flame);
+                        // 分配给高亮火焰 Mesh
+                        assignMeshMapping(idx, 4, typeCounts); setInstanceColor(idx, CONFIG.colors.flame);
                     }
                     idx++;
                 }
             }
 
+            // 问题一：修正文字超出画幅 -> 缩小分布系数 (0.15 -> 0.13)
             const cvs = document.createElement('canvas'); cvs.width=800; cvs.height=200; 
             const ctx = cvs.getContext('2d'); ctx.font='900 80px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; 
             ctx.fillText('HAPPY BIRTHDAY', 400, 120);
             const data = ctx.getImageData(0,0,800,200).data; const valid = [];
-            for(let y=0; y<200; y+=4) for(let x=0; x<800; x+=4) if(data[(y*800+x)*4]>128) valid.push({x:(x-400)*0.15, y:(100-y)*0.15+8});
+            for(let y=0; y<200; y+=4) for(let x=0; x<800; x+=4) if(data[(y*800+x)*4]>128) valid.push({x:(x-400)*0.13, y:(100-y)*0.13+8});
             
             for(let i=0; i<CONFIG.count; i++) {
                 const p = valid[i%valid.length];
@@ -403,13 +414,11 @@
                 const face = faceLandmarker.detectForVideo(video, t);
                 const hand = handLandmarker.detectForVideo(video, t);
 
-                // --- 交互逻辑 (支持双模式触发) ---
                 if (state.step === 0) {
                     if (face.faceBlendshapes.length > 0) {
                         const pucker = face.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
                         if (pucker > CONFIG.blowThreshold) { puckerFrames++; if (puckerFrames > 8) triggerBlowSequence(); } else puckerFrames = 0;
                     }
-                    // 蛋糕状态下张手 -> 直接爆炸
                     if (hand.landmarks.length > 0) {
                         const lm = hand.landmarks[0];
                         const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
@@ -432,16 +441,14 @@
             const pos = particleData.currentPos;
             const rot = particleData.currentRot;
             
-            // --- 目标选择逻辑 ---
             let target;
-            if (state.step === 3) target = particleData.scatterPos; // 炸开到限定画幅内
+            if (state.step === 3) target = particleData.scatterPos; 
             else if (state.step === 2) target = particleData.textPos;
             else target = particleData.cakePos;
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
                 
-                // 状态特有动画
                 if (state.step === 0 && particleData.type[i] === 2) { 
                     pos[i3] += (Math.random()-0.5)*0.1; 
                     particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.05;
@@ -451,12 +458,11 @@
                     rot[i3]+=0.15; rot[i3+2]+=0.15;
                 }
 
-                if (state.step === 3) { // 散开时的微动
+                if (state.step === 3) {
                      pos[i3] += Math.sin(time + particleData.noise[i]) * 0.05;
                      pos[i3+1] += Math.cos(time * 0.9 + particleData.noise[i]) * 0.05;
                 }
 
-                // 统一的平滑运动逻辑
                 if (state.step !== 1 || particleData.type[i] !== 2) { 
                     const speed = (state.step === 3) ? 0.06 : ((state.step === 0) ? 0.15 : 0.08);
                     pos[i3] += (target[i3] - pos[i3]) * speed;
