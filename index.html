@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Pink Dream Cake</title>
+    <title>Rose Gold Jewel Cake</title>
     <link rel="icon" href="data:;base64,=">
     <style>
         body { 
-            margin: 0; overflow: hidden; background: #050203; /* 极深粉紫黑背景 */
+            margin: 0; overflow: hidden; background: #050203;
             font-family: 'Times New Roman', serif; 
             user-select: none; -webkit-user-select: none; 
         }
-        
+        /* 确保UI层穿透鼠标事件 */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
         
         h1 {
@@ -51,7 +51,7 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="log-text" id="log">Baking Pink Dreams...</div>
+        <div class="log-text" id="log">Polishing Gems...</div>
     </div>
 
     <div id="ui-layer">
@@ -83,15 +83,15 @@
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 最终参数：粉色系、1000粒子 ---
+        // --- 最终配置 ---
         const CONFIG = {
-            count: 1000, 
+            count: 1000, // 粒子数
             colors: {
-                rose: new THREE.Color(0xFFB7C5), // 主色：樱花粉
-                gold: new THREE.Color(0xFFE4B5), // 点缀：香槟金
-                ivory: new THREE.Color(0xFFFFF0), // 点缀：奶油白
-                flame: new THREE.Color(0xFF8844), // 火焰：暖橙
-                smoke: new THREE.Color(0x664455)  // 熄灭：紫灰
+                pearl: new THREE.Color(0xFFFFF0), // 底层：珍珠白
+                pink: new THREE.Color(0xFFB7C5),  // 顶层：少女粉
+                gold: new THREE.Color(0xFFD700),  // 金色点缀
+                flame: new THREE.Color(0xFF5500), // 亮橙火焰
+                smoke: new THREE.Color(0x333333)  // 烟雾色
             },
             blowThreshold: 0.35, 
             spreadThreshold: 0.4, 
@@ -100,17 +100,16 @@
         let scene, camera, renderer, composer, mainGroup;
         let handLandmarker, faceLandmarker, video;
         let puckerFrames = 0;
-        let state = { step: 0, rotation: 0, aiReady: false }; 
+        let state = { step: 0, rotation: 0, aiReady: false, blowStartTime: 0 }; 
 
-        // 安全数据结构
         const particleData = {
             cakePos: new Float32Array(CONFIG.count * 3),
             textPos: new Float32Array(CONFIG.count * 3),
             scatterPos: new Float32Array(CONFIG.count * 3), 
             currentPos: new Float32Array(CONFIG.count * 3),
             currentRot: new Float32Array(CONFIG.count * 3),
-            type: new Uint8Array(CONFIG.count), 
-            shapeType: new Uint8Array(CONFIG.count),
+            type: new Uint8Array(CONFIG.count), // 0:蛋糕, 1:烛台, 2:火焰
+            shapeType: new Uint8Array(CONFIG.count), // 0:球, 1:方, 2:棍, 3:锥
             noise: new Float32Array(CONFIG.count),
             meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
         };
@@ -145,6 +144,7 @@
             }
         }
 
+        // 强力交互修复：绑定到window
         function setupMouseFallback() {
             window.addEventListener('click', triggerBlowSequence);
             window.addEventListener('mousemove', e => {
@@ -156,13 +156,14 @@
 
         function triggerBlowSequence() {
             if (state.step === 0) {
-                state.step = 1; 
-                setCandleColor(CONFIG.colors.smoke);
+                state.step = 1;
+                state.blowStartTime = performance.now(); // 开始计时动画
+                // 注意：这里不立即 setCandleColor，而是在 animate 中做渐变
                 setTimeout(() => {
                     state.step = 2; 
                     updateTitle("Happy Birthday!", 1);
                     guide.innerText = state.aiReady ? "👐 张开手掌：释放魔法炸裂" : "🖱️ 移动鼠标观赏";
-                }, 1800);
+                }, 1600); // 等待火焰飘散动画完成
             }
         }
 
@@ -171,22 +172,17 @@
                 state.step = 0;
                 updateTitle("Princess Celebration", 0); 
                 guide.innerText = state.aiReady ? "✨ 嘟嘴吹灭 或 张手炸裂 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
-                setCandleColor(CONFIG.colors.flame, CONFIG.colors.ivory);
+                // 重置火焰
+                setFlameColor(CONFIG.colors.flame);
             }
         }
 
-        function setCandleColor(flameColor, wickColor) {
+        function setFlameColor(color) {
             for(let i=0; i<CONFIG.count; i++) {
                 const map = particleData.meshMapping[i];
-                if (map && shapes.meshes[map.meshIdx]) {
-                    // 火焰 Mesh 是 index 3
-                    if (particleData.shapeType[i] === 3) { 
-                         shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, flameColor);
-                    } 
-                    // 烛芯 类型是 1
-                    else if (wickColor && particleData.type[i] === 1) { 
-                         shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, wickColor);
-                    }
+                // 仅针对火焰粒子 (Type 2)
+                if (map && particleData.type[i] === 2 && shapes.meshes[map.meshIdx]) {
+                     shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, color);
                 }
             }
             shapes.meshes.forEach(m => { if(m.instanceColor) m.instanceColor.needsUpdate = true; });
@@ -202,25 +198,12 @@
             }, 500);
         }
 
-        // --- 真实感火焰几何体 (Lathe) ---
-        function createFlameGeometry() {
-            const points = [];
-            for ( let i = 0; i < 10; i ++ ) {
-                const t = i / 9;
-                points.push( new THREE.Vector2( Math.sin( t * Math.PI ) * 0.3 * (1-t), t * 1.5 ) );
-            }
-            const geo = new THREE.LatheGeometry( points, 12 );
-            geo.center(); 
-            geo.translate(0, 0.75, 0); // 底部对齐
-            return geo;
-        }
-
         function initThree() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050203, 0.015); // 粉紫黑背景
+            scene.fog = new THREE.FogExp2(0x050203, 0.015);
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 45);
+            camera.position.set(0, 6, 50);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -229,7 +212,7 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.physicallyCorrectLights = true;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.1; 
+            renderer.toneMappingExposure = 1.0; 
             document.body.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
@@ -238,53 +221,53 @@
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
-            // --- 灯光系统 (粉嫩感) ---
-            const ambient = new THREE.AmbientLight(0xffcce0, 0.6); 
+            const ambient = new THREE.AmbientLight(0xffcce0, 0.5); 
             scene.add(ambient);
             
-            const dirLight = new THREE.DirectionalLight(0xffd700, 1.5); 
+            const dirLight = new THREE.DirectionalLight(0xfffff0, 1.8); 
             dirLight.position.set(15, 25, 15);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
             
-            const pointLightRose = new THREE.PointLight(0xff69b4, 2.5, 80); 
+            const pointLightRose = new THREE.PointLight(0xff69b4, 2.0, 80); 
             pointLightRose.position.set(-20, 10, -10);
             scene.add(pointLightRose);
 
-            const centerLight = new THREE.PointLight(0xffaa55, 1.5, 30);
+            const centerLight = new THREE.PointLight(0xffaa55, 1.0, 30);
             centerLight.position.set(0, 8, 0);
             mainGroup.add(centerLight);
 
-            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.6, 0.8);
+            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.7, 0.5, 0.85);
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloom);
 
-            // --- 材质定义 ---
-            const matRose = new THREE.MeshStandardMaterial({ color: CONFIG.colors.rose, roughness: 0.25, metalness: 0.4 });
-            const matGold = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.15, metalness: 0.85 });
-            const matIvory = new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.3, metalness: 0.1 });
+            // --- 材质 (问题一：高反光) ---
+            // 粗糙度极低，模拟抛光质感
+            const matPearl = new THREE.MeshStandardMaterial({ color: CONFIG.colors.pearl, roughness: 0.05, metalness: 0.7 });
+            const matPink = new THREE.MeshStandardMaterial({ color: CONFIG.colors.pink, roughness: 0.1, metalness: 0.6 });
+            const matGold = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.1, metalness: 0.9 });
             const matFlame = new THREE.MeshStandardMaterial({ 
-                color: CONFIG.colors.flame, 
-                emissive: CONFIG.colors.flame, 
-                emissiveIntensity: 3.0, 
-                roughness: 0.0, 
-                metalness: 0.0 
+                color: CONFIG.colors.flame, emissive: CONFIG.colors.flame, emissiveIntensity: 3.0, roughness: 0.0, metalness: 0.0 
             });
             
-            // --- 几何体池 (无爱心) ---
-            // 粒子变大，因为数量变少了
-            const sphereGeo = new THREE.SphereGeometry(0.45, 20, 20); 
-            const boxGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
-            const candyGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.6, 12);
-            const flameGeo = createFlameGeometry();
+            // --- 几何体 (问题一：指定形状) ---
+            const sphereGeo = new THREE.SphereGeometry(0.4, 20, 20); 
+            const boxGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5); 
+            const candyGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 12); 
+            // 三棱锥 (四棱锥替代，视觉效果更好)
+            const coneGeo = new THREE.ConeGeometry(0.35, 0.7, 4); 
 
             const maxCount = CONFIG.count; 
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matRose, maxCount)); // 0: 球(粉)
-            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matGold, maxCount));    // 1: 方(金)
-            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matIvory, maxCount)); // 2: 棍(白)
-            shapes.meshes.push(new THREE.InstancedMesh(flameGeo, matFlame, maxCount)); // 3: 火焰
+            // 0-2: 球体 (白、粉、火焰)
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matPearl, maxCount)); // 0: 白球
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matPink, maxCount));  // 1: 粉球
+            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matFlame, maxCount)); // 2: 火焰球
+            // 3-5: 装饰 (方、棍、锥)
+            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matGold, maxCount));     // 3: 金方
+            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matGold, maxCount));   // 4: 金棍
+            shapes.meshes.push(new THREE.InstancedMesh(coneGeo, matGold, maxCount));    // 5: 金锥
 
             shapes.meshes.forEach(m => {
                 m.receiveShadow = true; m.castShadow = true;
@@ -293,71 +276,92 @@
             });
         }
 
-        // --- 生成螺旋蛋糕 (Spiral Cone) ---
         function generateShapes() {
-            const typeCounts = [0, 0, 0, 0];
+            const typeCounts = [0, 0, 0, 0, 0, 0];
             let idx = 0;
 
-            const bodyCount = Math.floor(CONFIG.count * 0.96); // 主体占比
-            const height = 14;
-            const baseRadius = 7.5;
-            const topRadius = 1.2;
-            const loops = 6.5; 
-            const startY = -6.5;
+            // 1. 底层 (珍珠白)
+            const bottomCount = Math.floor(CONFIG.count * 0.55);
+            const bottomRadius = 9;
+            const bottomHeight = 5;
+            const bottomY = -5;
 
-            for(; idx < bodyCount; idx++) {
-                const t = idx / bodyCount;
-                const angle = t * Math.PI * 2 * loops;
-                const currentRadius = THREE.MathUtils.lerp(baseRadius, topRadius, t);
-                const y = startY + t * height;
+            for(; idx < bottomCount; idx++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = bottomRadius * Math.sqrt(Math.random());
+                const y = bottomY + Math.random() * bottomHeight;
 
-                // 随机偏移，增加自然感
-                const rOffset = (Math.random() - 0.5) * 0.9;
-                const yOffset = (Math.random() - 0.5) * 0.4;
+                particleData.cakePos[idx*3] = r * Math.cos(angle);
+                particleData.cakePos[idx*3+1] = y;
+                particleData.cakePos[idx*3+2] = r * Math.sin(angle);
+                particleData.type[idx] = 0; 
 
-                particleData.cakePos[idx*3] = (currentRadius + rOffset) * Math.cos(angle);
-                particleData.cakePos[idx*3+1] = y + yOffset;
-                particleData.cakePos[idx*3+2] = (currentRadius + rOffset) * Math.sin(angle);
-                particleData.type[idx] = 0;
-
-                const shapeRnd = Math.random();
-                // 粉色少女感：大部分是粉色球(0)，点缀白色(2)和金色(1)
-                let shapeType;
-                if (shapeRnd < 0.75) shapeType = 0; // 75% 粉色
-                else if (shapeRnd < 0.90) shapeType = 2; // 15% 白色
-                else shapeType = 1; // 10% 金色
-
+                // 底层：白球为主，点缀金方和金锥
+                const rnd = Math.random();
+                let shapeType = rnd < 0.8 ? 0 : (rnd < 0.9 ? 3 : 5);
+                
                 particleData.shapeType[idx] = shapeType;
                 assignMeshMapping(idx, shapeType, typeCounts);
-                
                 calculateScatterPos(idx);
             }
 
-            // 顶部火焰
-            const topCount = CONFIG.count - idx;
-            const topY = startY + height + 0.8;
+            // 2. 顶层 (少女粉)
+            const topCount = Math.floor(CONFIG.count * 0.35);
+            const topRadius = 6;
+            const topHeight = 6;
+            const topY = bottomY + bottomHeight;
 
-            for(let k=0; k<topCount; k++) {
+            for(let k=0; k < topCount; k++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = topRadius * Math.sqrt(Math.random());
+                const y = topY + Math.random() * topHeight;
+
+                particleData.cakePos[idx*3] = r * Math.cos(angle);
+                particleData.cakePos[idx*3+1] = y;
+                particleData.cakePos[idx*3+2] = r * Math.sin(angle);
+                particleData.type[idx] = 0; 
+
+                // 顶层：粉球为主，点缀金棍
+                const rnd = Math.random();
+                let shapeType = rnd < 0.85 ? 1 : 4;
+                
+                particleData.shapeType[idx] = shapeType;
+                assignMeshMapping(idx, shapeType, typeCounts);
                 calculateScatterPos(idx);
-
-                if(k === topCount - 1) { // 唯一的火焰
-                    particleData.cakePos[idx*3]=0; particleData.cakePos[idx*3+1]=topY+1.2; particleData.cakePos[idx*3+2]=0;
-                    particleData.type[idx] = 2; 
-                    particleData.shapeType[idx] = 3; // 火焰 Mesh
-                    assignMeshMapping(idx, 3, typeCounts); 
-                } else { // 顶部装饰
-                    const r = Math.random() * 1.0;
-                    const angle = Math.random() * Math.PI * 2;
-                    particleData.cakePos[idx*3]=r*Math.cos(angle); 
-                    particleData.cakePos[idx*3+1]=topY + Math.random()*0.5; 
-                    particleData.cakePos[idx*3+2]=r*Math.sin(angle);
-                    particleData.type[idx] = 0;
-                    
-                    const shapeType = Math.random() > 0.6 ? 1 : 2; 
-                    particleData.shapeType[idx] = shapeType;
-                    assignMeshMapping(idx, shapeType, typeCounts);
-                }
                 idx++;
+            }
+
+            // 3. 蜡烛
+            const candleCount = CONFIG.count - idx;
+            const candleY = topY + topHeight;
+            const numCandles = 6;
+            
+            for(let c=0; c<numCandles; c++) {
+                const angle = (c / numCandles) * Math.PI * 2;
+                const r = topRadius * 0.6;
+                const cx = r * Math.cos(angle);
+                const cz = r * Math.sin(angle);
+
+                const parts = Math.floor(candleCount / numCandles);
+                for(let p=0; p<parts; p++) {
+                    if(idx >= CONFIG.count) break;
+                    calculateScatterPos(idx);
+
+                    if(p === 0) { // 火焰
+                        particleData.cakePos[idx*3]=cx; particleData.cakePos[idx*3+1]=candleY+1.5; particleData.cakePos[idx*3+2]=cz;
+                        particleData.type[idx] = 2; // 火焰标识
+                        particleData.shapeType[idx] = 2; // Mesh ID 2 (火焰球)
+                        assignMeshMapping(idx, 2, typeCounts);
+                    } else { // 烛台
+                        particleData.cakePos[idx*3]=cx + (Math.random()-0.5)*0.3; 
+                        particleData.cakePos[idx*3+1]=candleY + Math.random()*1.2; 
+                        particleData.cakePos[idx*3+2]=cz + (Math.random()-0.5)*0.3;
+                        particleData.type[idx] = 1; 
+                        particleData.shapeType[idx] = 4; // Mesh ID 4 (金棍)
+                        assignMeshMapping(idx, 4, typeCounts);
+                    }
+                    idx++;
+                }
             }
 
             // 文字
@@ -365,7 +369,6 @@
             const ctx = cvs.getContext('2d'); ctx.font='900 80px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; 
             ctx.fillText('HAPPY BIRTHDAY', 400, 120);
             const data = ctx.getImageData(0,0,800,200).data; const valid = [];
-            // 粒子少，采样间隔要大
             for(let y=0; y<200; y+=5) for(let x=0; x<800; x+=5) if(data[(y*800+x)*4]>128) valid.push({x:(x-400)*0.13, y:(100-y)*0.13+8});
             
             for(let i=0; i<CONFIG.count; i++) {
@@ -375,11 +378,11 @@
                 particleData.noise[i] = Math.random()*100;
             }
 
-            shapes.meshes.forEach(m => { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; });
+            shapes.meshes.forEach(m => { m.instanceMatrix.needsUpdate = true; });
         }
 
         function calculateScatterPos(idx) {
-            const scatterRadius = 28; 
+            const scatterRadius = 30; 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
             const sr = Math.cbrt(Math.random()) * scatterRadius; 
@@ -424,7 +427,7 @@
                 if (state.step === 0) {
                     if (face.faceBlendshapes.length > 0) {
                         const pucker = face.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
-                        if (pucker > CONFIG.blowThreshold) { puckerFrames++; if (puckerFrames > 8) triggerBlowSequence(); } else puckerFrames = 0;
+                        if (pucker > CONFIG.blowThreshold) { puckerFrames++; if (puckerFrames > 10) triggerBlowSequence(); } else puckerFrames = 0;
                     }
                     if (hand.landmarks.length > 0) {
                         const lm = hand.landmarks[0];
@@ -455,14 +458,21 @@
 
             for(let i=0; i<CONFIG.count; i++) {
                 const i3 = i*3;
-                
-                if (state.step === 0 && particleData.type[i] === 2) { 
-                    pos[i3] += (Math.random()-0.5)*0.1; 
-                    particleData.cakePos[i3+1] += Math.sin(time*15+i)*0.05;
+                let scale = 1.0;
+
+                // 动画逻辑
+                if (state.step === 0 && particleData.type[i] === 2) { // 火焰微动
+                    pos[i3] += Math.sin(time*12 + particleData.noise[i])*0.03;
+                    pos[i3+1] += Math.cos(time*8 + particleData.noise[i])*0.02;
                 }
+                
+                // 问题二：自然消失动画
                 if (state.step === 1 && particleData.type[i] === 2) { 
-                    pos[i3+1] += 0.2; pos[i3] += Math.sin(time*5+i)*0.05; 
-                    rot[i3]+=0.15; rot[i3+2]+=0.15;
+                    const elapsed = (performance.now() - state.blowStartTime) / 1600; 
+                    pos[i3+1] += 0.1 * (1-elapsed); // 向上
+                    scale = Math.max(0, 1 - elapsed); // 逐渐变小
+                } else if (state.step === 1 && particleData.type[i] !== 2) {
+                     pos[i3] += Math.sin(time*5+i)*0.02; // 其他粒子抖动
                 }
 
                 if (state.step === 3) {
@@ -471,7 +481,7 @@
                 }
 
                 if (state.step !== 1 || particleData.type[i] !== 2) { 
-                    const speed = (state.step === 3) ? 0.06 : ((state.step === 0) ? 0.15 : 0.08);
+                    const speed = (state.step === 3) ? 0.06 : ((state.step === 0) ? 0.12 : 0.08);
                     pos[i3] += (target[i3] - pos[i3]) * speed;
                     pos[i3+1] += (target[i3+1] - pos[i3+1]) * speed;
                     pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
@@ -482,12 +492,10 @@
                     shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
                     shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
                     
-                    let scale = 1.0;
-                    if (particleData.shapeType[i] === 3) { // 火焰
-                        scale = 1.8 + Math.sin(time*20 + particleData.noise[i])*0.15; 
-                    } else if (particleData.type[i] === 1) { // 烛芯
-                         scale = 0.8;
-                    }
+                    // 形状基础缩放
+                    if (particleData.shapeType[i] === 2) scale *= 1.5; // 火焰
+                    if (particleData.shapeType[i] === 3 || particleData.shapeType[i] === 5) scale *= 1.2; 
+
                     if(state.step === 3) scale *= 0.9;
                     if(state.step === 2) scale *= 0.7;
 
