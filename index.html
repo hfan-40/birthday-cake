@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luxury Rose Gold Birthday Cake</title>
+    <title>Grand Luxury Birthday Cake - Interactive Blowing</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #fdf5e6; font-family: 'Times New Roman', serif; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Cinzel', serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: center; padding-top: 40px; }
-        h1 { color: #d4af37; font-size: 32px; letter-spacing: 4px; text-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 0; }
-        #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .spinner { width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #d4af37; border-radius: 50%; animation: spin 1s linear infinite; }
+        h1 { color: #fceea7; font-size: 32px; letter-spacing: 6px; text-shadow: 0 0 30px rgba(252, 238, 167, 0.4); background: linear-gradient(to bottom, #fff, #e1b382); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+        #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { width: 40px; height: 40px; border: 2px solid rgba(212, 175, 55, 0.1); border-top-color: #d4af37; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #webcam-preview { position: absolute; bottom: 20px; right: 20px; width: 140px; height: 105px; border: 3px solid #d4af37; border-radius: 12px; z-index: 20; background: #000; transform: scaleX(-1); }
-        .hint { color: #d4af37; font-size: 14px; margin-top: 15px; letter-spacing: 2px; }
+        #webcam-preview { position: absolute; bottom: 20px; right: 20px; width: 130px; height: 98px; border: 1px solid rgba(212, 175, 55, 0.5); border-radius: 12px; z-index: 20; background: #000; transform: scaleX(-1); }
+        .hint { color: #d4af37; font-size: 11px; margin-top: 15px; letter-spacing: 2px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="spinner"></div>
-        <div class="hint" id="status">正在定制奢华庆典...</div>
+        <div class="hint" id="status">正在加载面部识别引擎...</div>
     </div>
 
     <div id="ui-layer">
-        <h1>Happy Birthday</h1>
-        <div class="hint">手势：张开=惊喜拆解 | 握拳=聚合祝福</div>
+        <h1 id="title">Grand Celebration</h1>
+        <div class="hint">🖐 张开：绽放 | ✊ 握拳：聚合 | 😗 嘟嘴吹气：点亮惊喜</div>
     </div>
 
     <canvas id="webcam-preview"></canvas>
@@ -35,6 +35,7 @@
     {
         "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
             "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs"
         }
     }
@@ -42,130 +43,174 @@
 
     <script type="module">
         import * as THREE from 'three';
-        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        let scene, camera, renderer, mainGroup, cakeElements = [];
-        let handLandmarker, video, lastVideoTime = -1;
-        let mode = 'CAKE';
+        let scene, camera, renderer, composer, mainGroup;
+        let handLandmarker, faceLandmarker, video, lastVideoTime = -1;
+        let cakeElements = [], textPoints = [];
+        let state = { mode: 'CAKE', isBlown: false, rotY: 0 };
+
+        const COLORS = { rose: 0xffb7c5, gold: 0xd4af37, ivory: 0xfffff0 };
 
         async function init() {
             setupScene();
-            createLuxCake();
-            setupLights();
+            createTextPoints(); // 预生成文字坐标
+            createInteractiveCake();
+            setupPostProcessing();
             
             try {
                 await initAI();
-                document.getElementById('status').innerText = "AI 准备就绪";
-            } catch (err) {
-                console.warn("AI 启动失败，切换到自动旋转模式");
-            }
+            } catch (e) { console.warn("AI Init failed."); }
 
-            setTimeout(() => {
-                document.getElementById('loader').style.display = 'none';
-                animate();
-            }, 800);
+            document.getElementById('loader').style.display = 'none';
+            animate();
         }
 
         function setupScene() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xfcf8f2);
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 10, 35);
+            camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 40);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.4; // 大幅调亮
+            renderer.toneMappingExposure = 1.8;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
-        }
 
-        function setupLights() {
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2)); // 强环境光
-            const spot = new THREE.SpotLight(0xffffff, 200);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const spot = new THREE.SpotLight(0xffffff, 150);
             spot.position.set(10, 30, 20);
             scene.add(spot);
-            const fill = new THREE.PointLight(0xffe4d1, 50);
-            fill.position.set(-15, 10, 10);
-            scene.add(fill);
         }
 
-        function createLuxCake() {
-            const ivory = new THREE.MeshStandardMaterial({ color: 0xfffff0, roughness: 0.1, metalness: 0.1 });
-            const rose = new THREE.MeshStandardMaterial({ color: 0xffb7c5, roughness: 0.2 });
-            const gold = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.1 });
-
-            // 底层蛋糕
-            const base = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 7, 64), ivory);
-            base.userData.home = new THREE.Vector3(0, -3.5, 0);
-            mainGroup.add(base); cakeElements.push(base);
-
-            // 顶层蛋糕
-            const top = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 6, 64), rose);
-            top.userData.home = new THREE.Vector3(0, 3, 0);
-            mainGroup.add(top); cakeElements.push(top);
-
-            // 金色插牌
+        // 生成 "HAPPY BIRTHDAY" 形状的坐标点阵
+        function createTextPoints() {
             const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 128;
+            canvas.width = 400; canvas.height = 100;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#d4af37'; ctx.font = 'bold 50px Georgia'; ctx.textAlign = 'center';
-            ctx.fillText('Happy Birthday', 256, 80);
-            const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
-            sign.userData.home = new THREE.Vector3(0, 8, 0);
-            mainGroup.add(sign); cakeElements.push(sign);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText('HAPPY BDAY', 10, 70);
+            
+            const imageData = ctx.getImageData(0, 0, 400, 100).data;
+            for (let y = 0; y < 100; y += 4) {
+                for (let x = 0; x < 400; x += 4) {
+                    if (imageData[(y * 400 + x) * 4] > 128) {
+                        textPoints.push(new THREE.Vector3((x - 200) * 0.15, (50 - y) * 0.15 + 10, 0));
+                    }
+                }
+            }
+        }
 
-            // 蜡烛与奶油流心装饰
-            for(let i=0; i<32; i++){
-                const h = 1.2 + Math.sin(i*0.8)*0.8;
-                const drip = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.1, h), rose);
-                const angle = (i/32) * Math.PI * 2;
-                drip.userData.home = new THREE.Vector3(Math.cos(angle)*6.6, 3.5 - h/2, Math.sin(angle)*6.6);
-                mainGroup.add(drip); cakeElements.push(drip);
+        function createInteractiveCake() {
+            const goldMat = new THREE.MeshPhysicalMaterial({ color: COLORS.gold, metalness: 1, roughness: 0.1 });
+            const geo = new THREE.SphereGeometry(0.3, 8, 8);
+
+            // 用粒子填充蛋糕形状
+            for (let i = 0; i < 2000; i++) {
+                const mesh = new THREE.Mesh(geo, goldMat);
+                const angle = Math.random() * Math.PI * 2;
+                let home = new THREE.Vector3();
+                
+                // 分配到蛋糕的双层结构
+                if (i < 1200) {
+                    const r = 8 + Math.random() * 1.5;
+                    home.set(Math.cos(angle)*r, Math.random()*6-3, Math.sin(angle)*r);
+                } else {
+                    const r = 5 + Math.random() * 1.2;
+                    home.set(Math.cos(angle)*r, Math.random()*5+3, Math.sin(angle)*r);
+                }
+
+                mesh.position.set(Math.random()*60-30, Math.random()*60-30, Math.random()*60-30);
+                mainGroup.add(mesh);
+                
+                // 赋予文字目标位置，如果没有对应的文字点，则随机散开
+                const textTarget = textPoints[i % textPoints.length] || new THREE.Vector3(Math.random()*40-20, 20, Math.random()*40-20);
+
+                cakeElements.push({
+                    mesh,
+                    home,
+                    scatter: mesh.position.clone().multiplyScalar(2),
+                    textTarget
+                });
             }
         }
 
         async function initAI() {
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            
+            // 同时初始化手势和面部识别
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
                 runningMode: "VIDEO", numHands: 1
             });
+
+            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
+                runningMode: "VIDEO", outputFaceBlendshapes: true
+            });
+
             video = document.getElementById('webcam-preview');
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream; video.play();
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            if (handLandmarker && video && video.readyState >= 2) {
-                if (video.currentTime !== lastVideoTime) {
-                    const result = handLandmarker.detectForVideo(video, performance.now());
-                    if (result.landmarks.length > 0) {
-                        const lm = result.landmarks[0];
-                        const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                        mode = (spread > 0.4) ? 'SCATTER' : 'CAKE';
-                        mainGroup.rotation.y = THREE.MathUtils.lerp(mainGroup.rotation.y, (lm[9].x - 0.5) * 4, 0.1);
-                    }
-                    lastVideoTime = video.currentTime;
-                }
-            } else { mainGroup.rotation.y += 0.01; }
-
-            cakeElements.forEach(el => {
-                const target = (mode === 'CAKE') ? el.userData.home : el.userData.home.clone().multiplyScalar(2.5).add(new THREE.Vector3(0,8,0));
-                el.position.lerp(target, 0.1);
-            });
-            renderer.render(scene, camera);
+        function setupPostProcessing() {
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.0, 0.4, 0.8));
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function animate() {
+            requestAnimationFrame(animate);
+            const now = performance.now();
+
+            if (video && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+                // 手势处理
+                const handRes = handLandmarker.detectForVideo(video, now);
+                if (handRes.landmarks.length > 0) {
+                    const lm = handRes.landmarks[0];
+                    const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+                    if (!state.isBlown) state.mode = (spread > 0.4) ? 'SCATTER' : 'CAKE';
+                    state.rotY = THREE.MathUtils.lerp(state.rotY, (lm[9].x - 0.5) * 4, 0.1);
+                }
+
+                // 嘟嘴（吹气）处理
+                const faceRes = faceLandmarker.detectForVideo(video, now);
+                if (faceRes.faceBlendshapes && faceRes.faceBlendshapes.length > 0) {
+                    const shapes = faceRes.faceBlendshapes[0].categories;
+                    // 'pucker' 类别代表嘟嘴程度
+                    const pucker = shapes.find(c => c.categoryName === 'mouthPucker')?.score || 0;
+                    if (pucker > 0.5 && !state.isBlown) {
+                        state.isBlown = true;
+                        state.mode = 'TEXT';
+                        document.getElementById('title').innerText = "Make A Wish!";
+                    }
+                }
+                lastVideoTime = video.currentTime;
+            }
+
+            mainGroup.rotation.y = state.rotY;
+
+            cakeElements.forEach(el => {
+                let target;
+                if (state.mode === 'TEXT') target = el.textTarget;
+                else if (state.mode === 'SCATTER') target = el.scatter;
+                else target = el.home;
+
+                el.mesh.position.lerp(target, 0.08);
+                if (state.mode === 'TEXT') el.mesh.rotation.y += 0.05;
+            });
+
+            composer.render();
+        }
 
         init();
     </script>
