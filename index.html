@@ -2,561 +2,352 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Lucky 777 Princess</title>
-    <link rel="icon" href="data:;base64,=">
+    <title>粒子蛋糕与手势点火 - Cyberpunk Birthday</title>
     <style>
-        body { 
-            margin: 0; overflow: hidden; background: #050203;
-            font-family: 'Times New Roman', serif; 
-            user-select: none; -webkit-user-select: none; 
-        }
-        
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 6vh; }
-        
-        h1 {
-            color: #FFD1DC; font-size: 3.2rem; letter-spacing: 0.3rem; text-transform: uppercase;
-            text-shadow: 0 0 20px rgba(255, 182, 193, 0.6), 0 0 40px rgba(255, 228, 225, 0.4);
-            margin-bottom: 15px; opacity: 0; animation: fadeIn 2s forwards 0.5s; text-align: center;
-        }
-
-        .hint-container {
-            display: flex; align-items: center; gap: 10px;
-            background: rgba(60, 20, 30, 0.6); border: 1px solid rgba(255, 192, 203, 0.4);
-            padding: 12px 35px; border-radius: 50px; 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            opacity: 0; animation: fadeIn 2s forwards 1.5s;
-            box-shadow: 0 0 30px rgba(255, 182, 193, 0.2); transition: all 0.5s;
-        }
-        .hint-text { color: #FFB6C1; font-size: 1rem; letter-spacing: 2px; font-weight: 700; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
-        .status-dot { width: 10px; height: 10px; background: #ff6666; border-radius: 50%; transition: all 0.5s; border: 2px solid #fff; box-shadow: 0 0 10px #ff3333; }
-        .status-active { background: #66ff66; box-shadow: 0 0 15px #33ff33; border-color: #ccffcc; }
-
-        #loader { position: fixed; inset: 0; background: #050102; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; pointer-events: auto; }
-        .circle { width: 100px; height: 100px; border: 3px solid rgba(255, 182, 193, 0.3); border-top: 3px solid #FF69B4; border-radius: 50%; animation: spin 1s infinite linear; }
-        .log-text { color: #FFC0CB; margin-top: 30px; font-size: 14px; letter-spacing: 4px; font-family: monospace; text-transform: uppercase; }
-
-        #webcam-preview { 
-            position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; 
-            border: 2px solid rgba(255, 192, 203, 0.5); border-radius: 12px; z-index: 20; 
-            transform: scaleX(-1); opacity: 0; transition: opacity 0.5s;
-            box-shadow: 0 5px 20px rgba(50, 10, 20, 0.5);
-        }
-
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        @keyframes fadeIn { to { opacity: 1; } }
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Courier New', Courier, monospace; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #video-input { position: absolute; top: 10px; left: 10px; width: 160px; height: 120px; z-index: 2; transform: scaleX(-1); border: 2px solid #333; opacity: 0.5; border-radius: 8px; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00ffcc; font-size: 24px; z-index: 10; pointer-events: none; transition: opacity 0.5s; text-align: center; }
+        #ui-layer { position: absolute; bottom: 30px; width: 100%; text-align: center; color: white; z-index: 5; pointer-events: none; }
+        .hud-text { background: rgba(0, 0, 0, 0.5); padding: 10px 20px; border: 1px solid #444; border-radius: 4px; display: inline-block; }
+        .status-lit { color: #ffaa00; text-shadow: 0 0 10px #ff0000; }
     </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <div id="loader">
-        <div class="circle"></div>
-        <div class="log-text" id="log">Setting 777 Gems...</div>
-    </div>
-
+    <div id="loading">正在初始化量子蛋糕...<br><span style="font-size:14px; color:#888;">请允许摄像头权限以进行点火仪式</span></div>
+    <video id="video-input"></video>
+    <div id="canvas-container"></div>
+    
     <div id="ui-layer">
-        <h1 id="title">Princess Celebration</h1>
-        <div class="hint-container" id="hint-box">
-            <span id="ai-status" class="status-dot"></span>
-            <span class="hint-text" id="guide">正在启动 AI 视觉...</span>
-        </div>
+        <div class="hud-text" id="instruction">移动食指靠近烛芯以点燃火焰</div>
     </div>
 
-    <video id="webcam" autoplay playsinline style="display:none;"></video>
-    <canvas id="webcam-preview"></canvas>
+<script>
+/**
+ * PART 1: THREE.JS 场景构建
+ * 核心理念：万物皆粒子。
+ */
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs"
-            }
-        }
-    </script>
+// 场景设置
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050505, 0.02);
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-        import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 4, 8);
+camera.lookAt(0, 1, 0);
 
-        // --- 最终修正配置 ---
-        const CONFIG = {
-            count: 777, // 严格锁定 777
-            colors: {
-                pearl: new THREE.Color(0xFFFFFA), // 珍珠白
-                pink: new THREE.Color(0xFFC1CC),  // 泡泡粉
-                gold: new THREE.Color(0xFFD700),  // 金色
-                flame: new THREE.Color(0xFF5500), // 火焰
-                smoke: new THREE.Color(0x333333)  
-            },
-            blowThreshold: 0.25, // 灵敏度高
-            spreadThreshold: 0.4, 
-        };
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-        let scene, camera, renderer, composer, mainGroup;
-        let handLandmarker, faceLandmarker, video;
-        let puckerFrames = 0;
-        let state = { step: 0, rotation: 0, aiReady: false, blowStartTime: 0 }; 
+// 辅助光源
+const ambientLight = new THREE.AmbientLight(0x404040);
+scene.add(ambientLight);
+const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+pointLight.position.set(5, 5, 5);
+scene.add(pointLight);
 
-        const particleData = {
-            cakePos: new Float32Array(CONFIG.count * 3),
-            textPos: new Float32Array(CONFIG.count * 3),
-            scatterPos: new Float32Array(CONFIG.count * 3), 
-            currentPos: new Float32Array(CONFIG.count * 3),
-            currentRot: new Float32Array(CONFIG.count * 3),
-            type: new Uint8Array(CONFIG.count), // 0:蛋糕, 1:烛台, 2:火焰
-            shapeType: new Uint8Array(CONFIG.count), 
-            noise: new Float32Array(CONFIG.count),
-            meshMapping: Array.from({length: CONFIG.count}, () => ({meshIdx: 0, instanceIdx: 0}))
-        };
+// --- 纹理生成器 (避免加载外部图片跨域问题) ---
+function createTexture(type) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    
+    if (type === 'soft') { // 柔和的光点 (火焰/蝴蝶结)
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 32, 32);
+    } else if (type === 'square') { // 方形 (照片云)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(2, 2, 28, 28);
+        ctx.fillStyle = '#aaaaaa'; // 模拟照片内容
+        ctx.fillRect(4, 4, 24, 20);
+    }
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+}
 
-        const shapes = { meshes: [], dummy: new THREE.Object3D() };
-        const logger = document.getElementById('log');
-        const guide = document.getElementById('guide');
+const texSoft = createTexture('soft');
+const texSquare = createTexture('square');
 
-        async function init() {
-            try {
-                logger.innerText = "Creating 3D Scene...";
-                initThree(); 
-                generateShapes(); 
-                
-                logger.innerText = "Initializing AI...";
-                await initAI();
-                
-                state.aiReady = true;
-                document.getElementById('ai-status').classList.add('status-active');
-                document.getElementById('webcam-preview').style.opacity = 1;
-                guide.innerText = "✨ 嘟嘴吹灭 或 张手炸裂 ✨"; 
-                
-            } catch (err) {
-                console.warn("AI Init Failed:", err);
-                state.aiReady = false;
-                guide.innerText = "🖱️ 点击屏幕吹灭蜡烛";
-                setupMouseFallback();
-            } finally {
-                setTimeout(() => {
-                    const loader = document.getElementById('loader');
-                    if(loader) loader.remove();
-                }, 1500);
-                animate();
-            }
-        }
-
-        function setupMouseFallback() {
-            window.addEventListener('click', triggerBlowSequence);
-            window.addEventListener('mousemove', e => {
-                if (state.step !== 2) {
-                    state.rotation = (e.clientX / window.innerWidth - 0.5) * 4;
-                }
-            });
-        }
-
-        function triggerBlowSequence() {
-            if (state.step === 0) {
-                state.step = 1;
-                state.blowStartTime = performance.now();
-                setTimeout(() => {
-                    state.step = 2; 
-                    updateTitle("Happy Birthday!", 1);
-                    guide.innerText = state.aiReady ? "👐 张开手掌：释放魔法炸裂" : "🖱️ 移动鼠标观赏";
-                }, 1600);
-            }
-        }
-
-        function resetToCake() {
-            if (state.step !== 0) {
-                state.step = 0;
-                updateTitle("Princess Celebration", 0); 
-                guide.innerText = state.aiReady ? "✨ 嘟嘴吹灭 或 张手炸裂 ✨" : "🖱️ 点击屏幕吹灭蜡烛";
-                setFlameColor(CONFIG.colors.flame);
-            }
-        }
-
-        function setFlameColor(color) {
-            for(let i=0; i<CONFIG.count; i++) {
-                const map = particleData.meshMapping[i];
-                if (map && particleData.type[i] === 2 && shapes.meshes[map.meshIdx]) {
-                     shapes.meshes[map.meshIdx].setColorAt(map.instanceIdx, color);
-                }
-            }
-            shapes.meshes.forEach(m => { if(m.instanceColor) m.instanceColor.needsUpdate = true; });
-        }
-
-        function updateTitle(text, opacity) {
-            const t = document.getElementById('title');
-            t.style.opacity = 0;
-            setTimeout(() => {
-                t.innerText = text;
-                t.style.textShadow = opacity ? "0 0 30px #FFB6C1, 0 0 50px #FF69B4" : "none";
-                t.style.opacity = opacity;
-            }, 500);
-        }
-
-        // --- 几何体 ---
-        function createFlameGeometry() {
-            const points = [];
-            for ( let i = 0; i < 10; i ++ ) {
-                const t = i / 9;
-                points.push( new THREE.Vector2( Math.sin( t * Math.PI ) * 0.35 * (1-t), t * 1.6 ) );
-            }
-            const geo = new THREE.LatheGeometry( points, 12 );
-            geo.center(); 
-            geo.translate(0, 0.8, 0); 
-            return geo;
-        }
-
-        function createBowGeometry() {
-            // 大蝴蝶结
-            const geo = new THREE.TorusKnotGeometry(0.6, 0.25, 64, 8, 2, 3);
-            geo.scale(1, 0.6, 0.4); 
-            return geo;
-        }
-
-        function initThree() {
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050203, 0.015);
-
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 6, 50);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.physicallyCorrectLights = true;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.0; 
-            document.body.appendChild(renderer.domElement);
-
-            mainGroup = new THREE.Group();
-            scene.add(mainGroup);
-
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-
-            const ambient = new THREE.AmbientLight(0xffcce0, 0.6); 
-            scene.add(ambient);
-            
-            const dirLight = new THREE.DirectionalLight(0xfffff0, 1.8); 
-            dirLight.position.set(15, 25, 15);
-            dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
-            scene.add(dirLight);
-            
-            const pointLightRose = new THREE.PointLight(0xff69b4, 2.0, 80); 
-            pointLightRose.position.set(-20, 10, -10);
-            scene.add(pointLightRose);
-
-            const centerLight = new THREE.PointLight(0xffaa55, 1.0, 30);
-            centerLight.position.set(0, 8, 0);
-            mainGroup.add(centerLight);
-
-            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.5, 0.85);
-            composer = new EffectComposer(renderer);
-            composer.addPass(new RenderPass(scene, camera));
-            composer.addPass(bloom);
-
-            // --- 材质 (极高珠光感) ---
-            const matPearl = new THREE.MeshStandardMaterial({ color: CONFIG.colors.pearl, roughness: 0.05, metalness: 0.5, emissive: 0x111111 });
-            const matPink = new THREE.MeshStandardMaterial({ color: CONFIG.colors.pink, roughness: 0.1, metalness: 0.4 });
-            const matGold = new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, roughness: 0.05, metalness: 0.95 });
-            const matFlame = new THREE.MeshStandardMaterial({ 
-                color: CONFIG.colors.flame, emissive: CONFIG.colors.flame, emissiveIntensity: 3.5, roughness: 0.0, metalness: 0.0 
-            });
-            
-            // --- 几何体 (放大尺寸以适配777数量) ---
-            const sphereGeo = new THREE.SphereGeometry(0.5, 20, 20); 
-            const boxGeo = new THREE.BoxGeometry(0.65, 0.65, 0.65); 
-            const candyGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.5, 12); 
-            const coneGeo = new THREE.ConeGeometry(0.45, 0.9, 4); 
-            const flameGeo = createFlameGeometry();
-            const bowGeo = createBowGeometry();
-
-            const maxCount = CONFIG.count; 
-            // 0-2: 球
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matPearl, maxCount)); // 0: 白球
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matPink, maxCount));  // 1: 粉球
-            shapes.meshes.push(new THREE.InstancedMesh(sphereGeo, matFlame, maxCount)); // 2: 火焰球
-            // 3-6: 装饰
-            shapes.meshes.push(new THREE.InstancedMesh(boxGeo, matGold, maxCount));     // 3: 金方
-            shapes.meshes.push(new THREE.InstancedMesh(candyGeo, matGold, maxCount));   // 4: 金棍
-            shapes.meshes.push(new THREE.InstancedMesh(coneGeo, matGold, maxCount));    // 5: 金锥
-            shapes.meshes.push(new THREE.InstancedMesh(bowGeo, matPearl, maxCount));    // 6: 白蝴蝶结
-
-            shapes.meshes.forEach(m => {
-                m.receiveShadow = true; m.castShadow = true;
-                m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mainGroup.add(m);
-            });
-        }
-
-        function generateShapes() {
-            const typeCounts = [0, 0, 0, 0, 0, 0, 0];
-            let idx = 0;
-
-            // 1. 底层 (珍珠白) - 宽矮，松散
-            const bottomCount = Math.floor(CONFIG.count * 0.55);
-            const bottomRadius = 9;
-            const bottomHeight = 5;
-            const bottomY = -5;
-
-            for(; idx < bottomCount; idx++) {
-                const angle = Math.random() * Math.PI * 2;
-                // 增加半径随机性，制造松散感
-                const r = bottomRadius * Math.sqrt(Math.random()) + (Math.random()-0.5) * 2.0; 
-                const y = bottomY + Math.random() * bottomHeight + (Math.random()-0.5) * 1.5;
-
-                particleData.cakePos[idx*3] = r * Math.cos(angle);
-                particleData.cakePos[idx*3+1] = y;
-                particleData.cakePos[idx*3+2] = r * Math.sin(angle);
-                particleData.type[idx] = 0; 
-
-                const rnd = Math.random();
-                let shapeType = 0;
-                if(rnd < 0.65) shapeType = 0; // 65% 白球
-                else if (rnd < 0.85) shapeType = 6; // 20% 蝴蝶结 (显眼)
-                else if (rnd < 0.92) shapeType = 3; // 7% 金方
-                else shapeType = 5; // 8% 金锥
-                
-                particleData.shapeType[idx] = shapeType;
-                assignMeshMapping(idx, shapeType, typeCounts);
-                calculateScatterPos(idx);
-            }
-
-            // 2. 顶层 (少女粉) - 窄高
-            const topCount = Math.floor(CONFIG.count * 0.35);
-            const topRadius = 6;
-            const topHeight = 6;
-            const topY = bottomY + bottomHeight;
-
-            for(let k=0; k < topCount; k++) {
-                const angle = Math.random() * Math.PI * 2;
-                const r = topRadius * Math.sqrt(Math.random()) + (Math.random()-0.5) * 1.5;
-                const y = topY + Math.random() * topHeight + (Math.random()-0.5) * 1.0;
-
-                particleData.cakePos[idx*3] = r * Math.cos(angle);
-                particleData.cakePos[idx*3+1] = y;
-                particleData.cakePos[idx*3+2] = r * Math.sin(angle);
-                particleData.type[idx] = 0; 
-
-                const rnd = Math.random();
-                let shapeType = rnd < 0.85 ? 1 : 4; // 85% 粉球, 15% 金棍
-                
-                particleData.shapeType[idx] = shapeType;
-                assignMeshMapping(idx, shapeType, typeCounts);
-                calculateScatterPos(idx);
-                idx++;
-            }
-
-            // 3. 蜡烛
-            const candleCount = CONFIG.count - idx;
-            const candleY = topY + topHeight;
-            const numCandles = 6;
-            
-            for(let c=0; c<numCandles; c++) {
-                const angle = (c / numCandles) * Math.PI * 2;
-                const r = topRadius * 0.65;
-                const cx = r * Math.cos(angle);
-                const cz = r * Math.sin(angle);
-
-                const parts = Math.floor(candleCount / numCandles);
-                for(let p=0; p<parts; p++) {
-                    if(idx >= CONFIG.count) break;
-                    calculateScatterPos(idx);
-
-                    if(p === 0) { // 火焰 (Shape 2)
-                        particleData.cakePos[idx*3]=cx; particleData.cakePos[idx*3+1]=candleY+1.5; particleData.cakePos[idx*3+2]=cz;
-                        particleData.type[idx] = 2; 
-                        particleData.shapeType[idx] = 2; // Flame Mesh
-                        assignMeshMapping(idx, 2, typeCounts);
-                    } else { // 烛台 (Shape 4)
-                        particleData.cakePos[idx*3]=cx + (Math.random()-0.5)*0.3; 
-                        particleData.cakePos[idx*3+1]=candleY + Math.random()*1.2; 
-                        particleData.cakePos[idx*3+2]=cz + (Math.random()-0.5)*0.3;
-                        particleData.type[idx] = 1; 
-                        particleData.shapeType[idx] = 4; // Candy Mesh
-                        assignMeshMapping(idx, 4, typeCounts);
-                    }
-                    idx++;
-                }
-            }
-
-            // 文字
-            const cvs = document.createElement('canvas'); cvs.width=800; cvs.height=200; 
-            const ctx = cvs.getContext('2d'); ctx.font='900 80px "Times New Roman"'; ctx.fillStyle='white'; ctx.textAlign='center'; 
-            ctx.fillText('HAPPY BIRTHDAY', 400, 120);
-            const data = ctx.getImageData(0,0,800,200).data; const valid = [];
-            // 777个粒子，采样稀疏
-            for(let y=0; y<200; y+=6) for(let x=0; x<800; x+=6) if(data[(y*800+x)*4]>128) valid.push({x:(x-400)*0.13, y:(100-y)*0.13+8});
-            
-            for(let i=0; i<CONFIG.count; i++) {
-                const p = valid[i%valid.length];
-                particleData.textPos[i*3] = p.x; particleData.textPos[i*3+1] = p.y; particleData.textPos[i*3+2] = (Math.random()-0.5)*3;
-                particleData.currentRot[i*3] = Math.random()*Math.PI; particleData.currentRot[i*3+1] = Math.random()*Math.PI; particleData.currentRot[i*3+2] = Math.random()*Math.PI;
-                particleData.noise[i] = Math.random()*100;
-            }
-
-            shapes.meshes.forEach(m => { m.instanceMatrix.needsUpdate = true; });
-        }
-
-        function calculateScatterPos(idx) {
-            const scatterRadius = 35; 
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const sr = Math.cbrt(Math.random()) * scatterRadius; 
-            particleData.scatterPos[idx*3] = sr * Math.sin(phi) * Math.cos(theta);
-            particleData.scatterPos[idx*3+1] = sr * Math.sin(phi) * Math.sin(theta);
-            particleData.scatterPos[idx*3+2] = sr * Math.cos(phi);
-        }
-
-        function assignMeshMapping(particleIdx, shapeType, typeCounts) {
-            if (particleIdx >= CONFIG.count) return;
-            particleData.meshMapping[particleIdx] = { meshIdx: shapeType, instanceIdx: typeCounts[shapeType]++ };
-        }
-
-        async function initAI() {
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-            handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
-                runningMode: "VIDEO", numHands: 1
-            });
-            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
-                runningMode: "VIDEO", outputFaceBlendshapes: true
-            });
-            video = document.getElementById('webcam');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            return new Promise(resolve => video.onloadeddata = resolve);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = performance.now() * 0.001;
-
-            if (state.aiReady && video.readyState >= 2) {
-                const pc = document.getElementById('webcam-preview');
-                pc.getContext('2d').drawImage(video, 0, 0, pc.width, pc.height);
-                const t = performance.now();
-
-                const face = faceLandmarker.detectForVideo(video, t);
-                const hand = handLandmarker.detectForVideo(video, t);
-
-                if (state.step === 0) {
-                    if (face.faceBlendshapes.length > 0) {
-                        const cats = face.faceBlendshapes[0].categories;
-                        const pucker = cats.find(c => c.categoryName === 'mouthPucker').score;
-                        const funnel = cats.find(c => c.categoryName === 'mouthFunnel').score;
-                        // 混合检测，降低阈值
-                        if (pucker > CONFIG.blowThreshold || funnel > CONFIG.blowThreshold || (pucker+funnel)>0.4) { 
-                            puckerFrames++; if (puckerFrames > 5) triggerBlowSequence(); 
-                        } else {
-                            puckerFrames = 0;
-                        }
-                    }
-                    if (hand.landmarks.length > 0) {
-                        const lm = hand.landmarks[0];
-                        const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                        if (spread > CONFIG.spreadThreshold) state.step = 3; 
-                    }
-                }
-
-                if (hand.landmarks.length > 0) {
-                    const lm = hand.landmarks[0];
-                    const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                    if (state.step !== 2) state.rotation = (lm[9].x - 0.5) * 5; 
-                    
-                    if (state.step >= 2) { 
-                        if (spread > CONFIG.spreadThreshold) state.step = 3;
-                        else if (state.step === 3 && spread <= CONFIG.spreadThreshold) resetToCake();
-                    }
-                }
-            }
-
-            const pos = particleData.currentPos;
-            const rot = particleData.currentRot;
-            
-            let target;
-            if (state.step === 3) target = particleData.scatterPos; 
-            else if (state.step === 2) target = particleData.textPos;
-            else target = particleData.cakePos;
-
-            for(let i=0; i<CONFIG.count; i++) {
-                const i3 = i*3;
-                let scale = 1.0;
-
-                if (state.step === 0 && particleData.type[i] === 2) { // 火焰微动
-                    pos[i3] += Math.sin(time*12 + particleData.noise[i])*0.03;
-                    pos[i3+1] += Math.cos(time*8 + particleData.noise[i])*0.02;
-                }
-                
-                if (state.step === 1 && particleData.type[i] === 2) { 
-                    const elapsed = (performance.now() - state.blowStartTime) / 1600; 
-                    pos[i3+1] += 0.1 * (1-elapsed); 
-                    scale = Math.max(0, 1 - elapsed); 
-                } else if (state.step === 1 && particleData.type[i] !== 2) {
-                     pos[i3] += Math.sin(time*5+i)*0.02;
-                }
-
-                if (state.step === 3) {
-                     pos[i3] += Math.sin(time + particleData.noise[i]) * 0.05;
-                     pos[i3+1] += Math.cos(time * 0.9 + particleData.noise[i]) * 0.05;
-                }
-
-                if (state.step !== 1 || particleData.type[i] !== 2) { 
-                    const speed = (state.step === 3) ? 0.06 : ((state.step === 0) ? 0.12 : 0.08);
-                    pos[i3] += (target[i3] - pos[i3]) * speed;
-                    pos[i3+1] += (target[i3+1] - pos[i3+1]) * speed;
-                    pos[i3+2] += (target[i3+2] - pos[i3+2]) * speed;
-                }
-
-                const map = particleData.meshMapping[i];
-                if (map && shapes.meshes[map.meshIdx]) {
-                    shapes.dummy.position.set(pos[i3], pos[i3+1], pos[i3+2]);
-                    
-                    // 火焰保持直立 (关键修复)
-                    if (particleData.shapeType[i] === 2) {
-                        shapes.dummy.rotation.set(0, rot[i3+1] + time, 0); 
-                    } else {
-                        shapes.dummy.rotation.set(rot[i3], rot[i3+1], rot[i3+2]);
-                    }
-                    
-                    if (particleData.shapeType[i] === 2) scale *= 1.6; // 火焰更大
-                    if (particleData.shapeType[i] === 3 || particleData.shapeType[i] === 5) scale *= 1.3; 
-                    if (particleData.shapeType[i] === 6) scale *= 2.2; // 蝴蝶结显著放大
-
-                    if(state.step === 3) scale *= 0.9;
-                    if(state.step === 2) scale *= 0.7;
-
-                    shapes.dummy.scale.set(scale, scale, scale);
-                    shapes.dummy.updateMatrix();
-                    shapes.meshes[map.meshIdx].setMatrixAt(map.instanceIdx, shapes.dummy.matrix);
-                }
-            }
-
-            shapes.meshes.forEach(m => m.instanceMatrix.needsUpdate = true);
-            
-            let targetRotation = state.step === 2 ? 0 : state.rotation;
-            if(mainGroup) mainGroup.rotation.y = THREE.MathUtils.lerp(mainGroup.rotation.y, targetRotation, 0.05);
-            
-            if(mainGroup && !state.aiReady && state.step === 0) mainGroup.rotation.y += 0.003; 
-
-            composer.render();
-        }
+// --- 1. 蛋糕体：照片云 (Photo Cloud) ---
+// 使用 Points 模拟大量照片汇聚成的实体
+function createCakeLayer(radius, height, yPos, count, color) {
+    const geometry = new THREE.CylinderGeometry(radius, radius, height, 60, 10);
+    const vertices = [];
+    const colors = [];
+    
+    // 采样几何体表面和内部
+    for (let i = 0; i < count; i++) {
+        // 简单的圆柱体随机采样
+        const r = radius * Math.sqrt(Math.random());
+        const theta = Math.random() * 2 * Math.PI;
+        const x = r * Math.cos(theta);
+        const z = r * Math.sin(theta);
+        const y = (Math.random() - 0.5) * height;
         
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; 
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight); 
-            composer.setSize(window.innerWidth, window.innerHeight);
-        });
+        vertices.push(x, y, z);
+        
+        // 随机微调颜色，模拟不同的照片
+        const c = new THREE.Color(color);
+        c.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+        colors.push(c.r, c.g, c.b);
+    }
 
-        init();
-    </script>
+    const bufGeo = new THREE.BufferGeometry();
+    bufGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    bufGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+        size: 0.15,
+        map: texSquare,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        sizeAttenuation: true
+    });
+
+    const points = new THREE.Points(bufGeo, material);
+    points.position.y = yPos;
+    return points;
+}
+
+const cakeBottom = createCakeLayer(3, 2, 1, 3000, 0xeeeeee); // 白色奶油层
+const cakeTop = createCakeLayer(2, 1.5, 2.75, 2000, 0xffeebb); // 顶层
+scene.add(cakeBottom);
+scene.add(cakeTop);
+
+// --- 2. 蝴蝶结：有序粒子 (Ordered State) ---
+// 紧密的、几乎静止的粒子
+const bowGeoRaw = new THREE.TorusKnotGeometry(0.8, 0.25, 120, 20);
+const bowMat = new THREE.PointsMaterial({
+    color: 0xff69b4, // Hot Pink
+    size: 0.08,
+    map: texSoft,
+    blending: THREE.NormalBlending, // 实体感
+    transparent: true,
+    opacity: 0.8
+});
+const bowPoints = new THREE.Points(bowGeoRaw, bowMat);
+bowPoints.position.set(0, 2.5, 2.1); // 放在蛋糕侧面
+bowPoints.rotation.x = Math.PI / 6;
+scene.add(bowPoints);
+
+// --- 3. 蜡烛与火焰：无序能量 (Disordered State) ---
+
+// 蜡烛实体
+const candleGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 16);
+const candleMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
+const candle = new THREE.Mesh(candleGeo, candleMat);
+candle.position.set(0, 4.25, 0); // 在顶层蛋糕之上
+scene.add(candle);
+
+// 烛芯位置 (触发点火的目标点)
+const wickPosition = new THREE.Vector3(0, 5.1, 0);
+
+// 火焰粒子系统
+const flameParticleCount = 800;
+const flameGeo = new THREE.BufferGeometry();
+const fPositions = new Float32Array(flameParticleCount * 3);
+const fColors = new Float32Array(flameParticleCount * 3);
+const fSizes = new Float32Array(flameParticleCount);
+const fLife = new Float32Array(flameParticleCount); // 生命周期
+
+for(let i=0; i<flameParticleCount; i++) {
+    fPositions[i*3] = 0; fPositions[i*3+1] = 0; fPositions[i*3+2] = 0;
+    fLife[i] = Math.random(); 
+    fSizes[i] = 0; // 初始大小为0 (熄灭)
+}
+
+flameGeo.setAttribute('position', new THREE.BufferAttribute(fPositions, 3));
+flameGeo.setAttribute('color', new THREE.BufferAttribute(fColors, 3));
+flameGeo.setAttribute('size', new THREE.BufferAttribute(fSizes, 1));
+
+const flameMat = new THREE.PointsMaterial({
+    size: 1.0,
+    vertexColors: true,
+    map: texSoft,
+    blending: THREE.AdditiveBlending, // 发光感
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.8
+});
+
+const flameSystem = new THREE.Points(flameGeo, flameMat);
+flameSystem.position.copy(wickPosition);
+scene.add(flameSystem);
+
+// 交互反馈：手指光标
+const cursorGeo = new THREE.SphereGeometry(0.2, 16, 16);
+const cursorMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5, wireframe: true });
+const cursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
+scene.add(cursorMesh);
+
+// 状态变量
+let isCandleLit = false;
+let handDetected = false;
+
+// 动画逻辑
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta();
+    const time = clock.getElapsedTime();
+
+    // 1. 旋转蛋糕展示
+    cakeBottom.rotation.y = time * 0.1;
+    cakeTop.rotation.y = time * 0.1;
+    bowPoints.position.x = Math.sin(time * 0.1 + Math.PI/2) * 2.1; // 简单的跟随旋转逻辑简化
+    bowPoints.position.z = Math.cos(time * 0.1 + Math.PI/2) * 2.1;
+    bowPoints.rotation.y = time * 0.1;
+
+    // 2. 蝴蝶结：微观振动 (有序)
+    // 视觉上稍微闪烁即可，不需要重算位置以节省性能
+
+    // 3. 火焰：流体动力学模拟 (无序)
+    const positions = flameSystem.geometry.attributes.position.array;
+    const colors = flameSystem.geometry.attributes.color.array;
+    const sizes = flameSystem.geometry.attributes.size.array;
+
+    for(let i=0; i<flameParticleCount; i++) {
+        if (isCandleLit) {
+            // 生命流逝
+            fLife[i] -= dt * (0.8 + Math.random() * 0.5);
+
+            // 如果死亡，重置到底部
+            if (fLife[i] <= 0) {
+                fLife[i] = 1;
+                positions[i*3] = (Math.random() - 0.5) * 0.1; // X source
+                positions[i*3+1] = 0; // Y source
+                positions[i*3+2] = (Math.random() - 0.5) * 0.1; // Z source
+            }
+
+            // 向上运动 + 湍流
+            positions[i*3+1] += dt * 2.5; // Up
+            positions[i*3] += Math.sin(time * 5 + positions[i*3+1]) * dt * 0.5; // X wobble
+            
+            // 颜色：黄 -> 红 -> 黑
+            const lifeRatio = fLife[i];
+            sizes[i] = lifeRatio * 1.5; // 越往上越小
+            
+            if (lifeRatio > 0.8) { // 底部：白/黄
+                colors[i*3] = 1; colors[i*3+1] = 1; colors[i*3+2] = 0.5;
+            } else if (lifeRatio > 0.4) { // 中部：橙/红
+                colors[i*3] = 1; colors[i*3+1] = lifeRatio; colors[i*3+2] = 0;
+            } else { // 顶部：烟灰
+                colors[i*3] = 0.2; colors[i*3+1] = 0.2; colors[i*3+2] = 0.2;
+            }
+        } else {
+            // 熄灭状态：粒子不可见
+            sizes[i] = 0;
+        }
+    }
+    flameSystem.geometry.attributes.position.needsUpdate = true;
+    flameSystem.geometry.attributes.color.needsUpdate = true;
+    flameSystem.geometry.attributes.size.needsUpdate = true;
+
+    // 渲染
+    renderer.render(scene, camera);
+}
+
+animate();
+
+/**
+ * PART 2: MediaPipe Hands 集成
+ */
+const videoElement = document.getElementById('video-input');
+const loadingText = document.getElementById('loading');
+const instructionText = document.getElementById('instruction');
+
+function onResults(results) {
+    loadingText.style.opacity = 0; // 隐藏加载文字
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handDetected = true;
+        const landmarks = results.multiHandLandmarks[0];
+        
+        // 获取食指指尖 (Index Finger Tip, 索引 8)
+        const indexTip = landmarks[8];
+
+        // 坐标映射：MediaPipe (0~1) -> Three.js World (Approx)
+        // 注意：Webcam是镜像的，x轴需要反转
+        const vector = new THREE.Vector3(
+            -(indexTip.x - 0.5) * 8, // 映射 X
+            -(indexTip.y - 0.5) * 6 + 2, // 映射 Y (向上偏移以匹配蛋糕高度)
+            (indexTip.z) * -5 // 深度映射 (粗略估计)
+        );
+
+        // 更新光标位置
+        cursorMesh.position.lerp(vector, 0.2); // 平滑插值
+
+        // 检测是否触碰烛芯
+        const distance = cursorMesh.position.distanceTo(wickPosition);
+        
+        // 判定逻辑：距离小于阈值
+        if (distance < 0.8 && !isCandleLit) {
+            triggerIgnition();
+        }
+
+    } else {
+        handDetected = false;
+    }
+}
+
+function triggerIgnition() {
+    isCandleLit = true;
+    instructionText.innerHTML = "<span class='status-lit'>★ 生日快乐！火焰已点燃 ★</span>";
+    instructionText.style.borderColor = "#ffaa00";
+    
+    // 爆发效果：点燃瞬间改变背景色一瞬间
+    const originalBg = scene.fog.color.getHex();
+    scene.fog.color.setHex(0x331100);
+    setTimeout(() => {
+        scene.fog.color.setHex(originalBg);
+    }, 200);
+}
+
+const hands = new Hands({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+}});
+
+hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+});
+
+hands.onResults(onResults);
+
+const cameraUtils = new Camera(videoElement, {
+    onFrame: async () => {
+        await hands.send({image: videoElement});
+    },
+    width: 640,
+    height: 480
+});
+
+cameraUtils.start();
+
+// 窗口调整
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
 </body>
 </html>
