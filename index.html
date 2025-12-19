@@ -3,48 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luxury Birthday Magic - Ultimate</title>
+    <title>Luxury Birthday - Stability Version</title>
     <style>
         body { margin: 0; overflow: hidden; background: #080808; font-family: 'Times New Roman', serif; }
         
-        /* UI 层 */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 5vh; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 5vh; }
         
         h1 {
-            color: #f0e6d2;
-            font-size: 2.5rem;
-            letter-spacing: 0.5rem;
-            text-transform: uppercase;
-            text-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
-            margin-bottom: 10px;
-            opacity: 0;
-            animation: fadeIn 2s forwards 1s;
+            color: #f0e6d2; font-size: 2.5rem; letter-spacing: 0.5rem; text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(212, 175, 55, 0.6); margin-bottom: 10px; opacity: 0; animation: fadeIn 2s forwards 1s;
         }
 
         .hint {
-            color: #d4af37;
-            font-size: 0.9rem;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            padding: 8px 20px;
-            border-radius: 20px;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-            opacity: 0;
-            animation: fadeIn 2s forwards 2s;
+            color: #d4af37; font-size: 0.9rem; border: 1px solid rgba(212, 175, 55, 0.3);
+            padding: 8px 20px; border-radius: 20px; background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px); opacity: 0; animation: fadeIn 2s forwards 2s; transition: all 0.5s;
         }
 
-        /* 加载动画 */
         #loader { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; }
         .circle { width: 50px; height: 50px; border: 2px solid rgba(212, 175, 55, 0.2); border-top: 2px solid #d4af37; border-radius: 50%; animation: spin 1s infinite linear; }
-        .loading-text { color: #d4af37; margin-top: 15px; font-size: 12px; letter-spacing: 2px; }
+        .status-text { color: #666; margin-top: 15px; font-size: 12px; font-family: sans-serif; }
 
-        /* 摄像头预览 (镜像) */
         #webcam-preview { 
             position: absolute; bottom: 20px; right: 20px; width: 120px; height: 90px; 
             border: 1px solid #d4af37; border-radius: 8px; z-index: 20; 
-            transform: scaleX(-1); opacity: 0.5; transition: opacity 0.3s;
+            transform: scaleX(-1); opacity: 0; transition: opacity 0.5s;
         }
-        #webcam-preview:hover { opacity: 1; }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
         @keyframes fadeIn { to { opacity: 1; } }
@@ -54,12 +38,12 @@
 
     <div id="loader">
         <div class="circle"></div>
-        <div class="loading-text" id="load-status">INITIALIZING MAGIC...</div>
+        <div class="status-text" id="log">INITIALIZING SYSTEM...</div>
     </div>
 
     <div id="ui-layer">
-        <h1 id="main-title">Grand Celebration</h1>
-        <div class="hint">🖐 张开: 散放 | ✊ 握拳: 聚合 | 😗 嘟嘴: 许愿(吹气)</div>
+        <h1 id="title">Grand Celebration</h1>
+        <div class="hint" id="guide">🖐 张开: 散放 | ✊ 握拳: 聚合 | 😗 嘟嘴: 吹气许愿</div>
     </div>
 
     <video id="webcam" autoplay playsinline style="display:none;"></video>
@@ -82,64 +66,95 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 配置 ---
+        // --- 系统配置 ---
         const CONFIG = {
-            count: 5000,
+            count: 4500,
             colors: { gold: 0xffd700, rose: 0xffb7c5, white: 0xffffff },
-            blowThreshold: 0.5, // 嘟嘴阈值
-            blowDuration: 15,   // 需要持续多少帧才触发（防抖）
+            blowThreshold: 0.5
         };
 
-        // --- 全局变量 ---
+        // --- 全局状态 ---
         let scene, camera, renderer, composer, particles;
         let handLandmarker, faceLandmarker, video;
-        let puckerCounter = 0; // 吹气计数器
-        
-        // 状态机
+        let puckerCounter = 0;
         let state = {
             mode: 'CAKE', // CAKE, SCATTER, TEXT
             isBlown: false,
             rotation: 0,
-            mouse: new THREE.Vector2()
+            useAI: false // 标记是否成功启用了 AI
         };
 
-        // 粒子数据
         const particleData = {
             cake: new Float32Array(CONFIG.count * 3),
             text: new Float32Array(CONFIG.count * 3),
             current: new Float32Array(CONFIG.count * 3),
-            speeds: new Float32Array(CONFIG.count), // 独立速度
-            noiseOffsets: new Float32Array(CONFIG.count) // 噪波偏移
+            noise: new Float32Array(CONFIG.count)
         };
 
+        const logger = document.getElementById('log');
+
         async function init() {
-            initThree();
-            generateCakeShape();
-            generateTextShape();
-            
             try {
-                await initAI();
-                document.getElementById('load-status').innerText = "READY";
+                logger.innerText = "Building 3D World...";
+                initThree();
+                generateShapes();
+                
+                logger.innerText = "Connecting AI Vision...";
+                await initAI(); // 尝试加载 AI
+                state.useAI = true;
+                document.getElementById('webcam-preview').style.opacity = 0.6;
+                
             } catch (err) {
-                console.warn("AI Init Failed, switching to Mouse Mode.", err);
-                document.querySelector('.hint').innerText = "🖱️ 移动: 旋转 | 🖱️ 点击: 吹灭蜡烛";
-                setupMouseFallback();
+                console.warn("AI Init Failed (Fallback Mode):", err);
+                enableMouseMode(); // 失败则启用鼠标模式
+            } finally {
+                // 无论成功失败，强制移除加载层
+                setTimeout(() => {
+                    const loader = document.getElementById('loader');
+                    loader.style.opacity = 0;
+                    setTimeout(() => loader.remove(), 800);
+                }, 500);
+                animate();
             }
-
-            // 隐藏 Loading
-            const loader = document.getElementById('loader');
-            loader.style.opacity = 0;
-            setTimeout(() => loader.remove(), 1000);
-
-            animate();
         }
 
-        // --- 1. Three.js 场景初始化 ---
+        function enableMouseMode() {
+            state.useAI = false;
+            const guide = document.getElementById('guide');
+            guide.innerText = "🖱️ 鼠标交互模式: 点击屏幕吹灭蜡烛";
+            guide.style.borderColor = "#ff4444";
+            
+            // 鼠标控制旋转
+            window.addEventListener('mousemove', (e) => {
+                state.rotation = (e.clientX / window.innerWidth - 0.5) * 4;
+            });
+            // 点击触发吹灭
+            window.addEventListener('click', triggerBlow);
+            // 触摸触发
+            window.addEventListener('touchstart', triggerBlow);
+        }
+
+        function triggerBlow() {
+            if (!state.isBlown) {
+                state.isBlown = true;
+                state.mode = 'TEXT';
+                updateTitle();
+            }
+        }
+
+        function updateTitle() {
+            const t = document.getElementById('title');
+            t.style.opacity = 0;
+            setTimeout(() => {
+                t.innerText = "Make A Wish!";
+                t.style.opacity = 1;
+            }, 500);
+        }
+
+        // --- Three.js 核心 ---
         function initThree() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x080808, 0.02);
-
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 40);
 
             renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
@@ -147,125 +162,81 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.body.appendChild(renderer.domElement);
 
-            // 后处理 (Bloom 辉光)
-            const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.5, 0.85);
-            bloomPass.strength = 1.2;
-            bloomPass.radius = 0.5;
-            
+            // 辉光特效
+            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.5, 0.85);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
-            composer.addPass(bloomPass);
+            composer.addPass(new RenderPass(scene, camera));
+            composer.addPass(bloom);
 
-            // 创建粒子系统
-            const geometry = new THREE.BufferGeometry();
+            // 粒子初始化
+            const geo = new THREE.BufferGeometry();
             const colors = [];
-            const sizes = [];
             
-            for (let i = 0; i < CONFIG.count; i++) {
-                particleData.current[i*3] = (Math.random()-0.5) * 100;
-                particleData.current[i*3+1] = (Math.random()-0.5) * 100;
-                particleData.current[i*3+2] = (Math.random()-0.5) * 100;
+            for(let i=0; i<CONFIG.count; i++) {
+                particleData.current[i*3] = (Math.random()-0.5)*100;
+                particleData.current[i*3+1] = (Math.random()-0.5)*100;
+                particleData.current[i*3+2] = (Math.random()-0.5)*100;
+                particleData.noise[i] = Math.random() * 100;
 
-                particleData.speeds[i] = 0.02 + Math.random() * 0.05;
-                particleData.noiseOffsets[i] = Math.random() * 100;
-
-                // 颜色分配：60% 玫瑰粉, 30% 金色, 10% 白色
-                const r = Math.random();
-                const color = new THREE.Color(r > 0.4 ? CONFIG.colors.rose : (r > 0.1 ? CONFIG.colors.gold : CONFIG.colors.white));
-                colors.push(color.r, color.g, color.b);
-                
-                // 大小随机
-                sizes.push(r > 0.1 ? 0.15 : 0.08); 
+                const c = new THREE.Color(i%3===0 ? CONFIG.colors.rose : (i%3===1 ? CONFIG.colors.gold : CONFIG.colors.white));
+                colors.push(c.r, c.g, c.b);
             }
-
-            geometry.setAttribute('position', new THREE.BufferAttribute(particleData.current, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-
-            // 自定义材质 (圆形粒子)
-            const material = new THREE.PointsMaterial({
-                size: 0.2,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.9,
-                blending: THREE.AdditiveBlending,
-                sizeAttenuation: true
-            });
-
-            particles = new THREE.Points(geometry, material);
+            geo.setAttribute('position', new THREE.BufferAttribute(particleData.current, 3));
+            geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({
+                size: 0.18, vertexColors: true, transparent: true, 
+                blending: THREE.AdditiveBlending, depthWrite: false
+            }));
             scene.add(particles);
-
-            window.addEventListener('resize', onWindowResize);
         }
 
-        // --- 2. 形状生成算法 ---
-        function generateCakeShape() {
-            for (let i = 0; i < CONFIG.count; i++) {
-                const i3 = i * 3;
+        // --- 形状生成 ---
+        function generateShapes() {
+            // 蛋糕形状
+            for(let i=0; i<CONFIG.count; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                let r, x, y, z;
-
-                if (i < CONFIG.count * 0.6) {
-                    // 底层
-                    r = 8 + Math.random() * 1.5;
-                    y = Math.random() * 6 - 4;
-                } else {
-                    // 顶层 + 奶油流淌
-                    r = 5 + Math.random() * 1.2;
-                    y = Math.random() * 5 + 2;
-                    // 模拟流淌的奶油边
-                    if (Math.random() > 0.8) y -= Math.sin(angle * 5) * 1.5; 
+                let r, y;
+                if(i < CONFIG.count * 0.6) { // 底层
+                    r = 8 + Math.random(); y = Math.random()*6-4;
+                } else { // 顶层
+                    r = 5 + Math.random(); y = Math.random()*5+2;
+                    if(Math.random()>0.8) y -= Math.sin(angle*5)*1.5; // 奶油流淌
                 }
-                
-                x = Math.cos(angle) * r;
-                z = Math.sin(angle) * r;
+                particleData.cake[i*3] = Math.cos(angle)*r;
+                particleData.cake[i*3+1] = y;
+                particleData.cake[i*3+2] = Math.sin(angle)*r;
+            }
 
-                particleData.cake[i3] = x;
-                particleData.cake[i3+1] = y;
-                particleData.cake[i3+2] = z;
+            // 文字形状
+            const cvs = document.createElement('canvas');
+            cvs.width=600; cvs.height=150;
+            const ctx = cvs.getContext('2d');
+            ctx.font='900 60px Times New Roman';
+            ctx.fillStyle='white'; ctx.textAlign='center';
+            ctx.fillText('HAPPY BIRTHDAY', 300, 80);
+            const data = ctx.getImageData(0,0,600,150).data;
+            const valid = [];
+            for(let y=0; y<150; y+=3) for(let x=0; x<600; x+=3) 
+                if(data[(y*600+x)*4]>128) valid.push({x:(x-300)*0.12, y:(75-y)*0.12+5});
+            
+            for(let i=0; i<CONFIG.count; i++) {
+                const p = valid[i%valid.length];
+                particleData.text[i*3] = p.x;
+                particleData.text[i*3+1] = p.y;
+                particleData.text[i*3+2] = (Math.random()-0.5)*2;
             }
         }
 
-        function generateTextShape() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 128;
-            const ctx = canvas.getContext('2d');
-            ctx.font = '900 60px "Times New Roman"';
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('HAPPY BIRTHDAY', 256, 64);
-
-            const imgData = ctx.getImageData(0, 0, 512, 128).data;
-            const validPixels = [];
-
-            for (let y = 0; y < 128; y += 2) {
-                for (let x = 0; x < 512; x += 2) {
-                    if (imgData[(y * 512 + x) * 4] > 128) {
-                        validPixels.push({
-                            x: (x - 256) * 0.15,
-                            y: (64 - y) * 0.15 + 5 // 抬高一点
-                        });
-                    }
-                }
-            }
-
-            for (let i = 0; i < CONFIG.count; i++) {
-                const i3 = i * 3;
-                // 如果粒子多于像素，随机分配到某个像素点
-                const pixel = validPixels[i % validPixels.length];
-                particleData.text[i3] = pixel.x;
-                particleData.text[i3+1] = pixel.y;
-                particleData.text[i3+2] = (Math.random() - 0.5) * 2; // 给文字一点厚度
-            }
-        }
-
-        // --- 3. AI 初始化 (串行加载) ---
+        // --- AI 视觉 (带超时保护) ---
         async function initAI() {
-            document.getElementById('load-status').innerText = "LOADING VISION CORE...";
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("WebCam API not available (Non-HTTPS?)");
+            }
+
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
             
+            // 串行加载
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
                 runningMode: "VIDEO", numHands: 1
@@ -280,119 +251,90 @@
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             
-            // 预览 canvas
-            video.addEventListener('loadeddata', () => {
-                const pc = document.getElementById('webcam-preview');
-                pc.width = video.videoWidth;
-                pc.height = video.videoHeight;
+            return new Promise(resolve => {
+                video.onloadeddata = () => {
+                    const preview = document.getElementById('webcam-preview');
+                    preview.getContext('2d').drawImage(video, 0, 0);
+                    resolve();
+                };
             });
         }
 
-        function setupMouseFallback() {
-            window.addEventListener('mousemove', (e) => {
-                state.rotation = (e.clientX / window.innerWidth - 0.5) * 4;
-            });
-            window.addEventListener('click', () => {
-                if (!state.isBlown) triggerBlow();
-            });
-        }
-
-        function triggerBlow() {
-            state.isBlown = true;
-            state.mode = 'TEXT';
-            const title = document.getElementById('main-title');
-            title.style.opacity = 0;
-            setTimeout(() => {
-                title.innerText = "Make A Wish!";
-                title.style.color = "#fff";
-                title.style.opacity = 1;
-            }, 500);
-        }
-
-        // --- 4. 动画循环 ---
+        // --- 渲染循环 ---
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
 
-            // --- AI 检测逻辑 ---
-            if (video && video.readyState >= 2) {
+            // AI 逻辑
+            if (state.useAI && video.readyState >= 2) {
                 // 绘制预览
                 const pc = document.getElementById('webcam-preview');
                 pc.getContext('2d').drawImage(video, 0, 0, pc.width, pc.height);
 
+                const t = performance.now();
+                const hand = handLandmarker.detectForVideo(video, t);
+                const face = faceLandmarker.detectForVideo(video, t);
+
                 // 手势
-                const handRes = handLandmarker.detectForVideo(video, performance.now());
-                if (handRes.landmarks.length > 0) {
-                    const lm = handRes.landmarks[0];
+                if(hand.landmarks.length > 0) {
+                    const lm = hand.landmarks[0];
                     const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                    if (!state.isBlown) {
-                        state.mode = spread > 0.45 ? 'SCATTER' : 'CAKE';
-                    }
-                    state.rotation = THREE.MathUtils.lerp(state.rotation, (lm[9].x - 0.5) * 5, 0.1);
+                    if (!state.isBlown) state.mode = spread > 0.45 ? 'SCATTER' : 'CAKE';
+                    state.rotation = (lm[9].x - 0.5) * 4;
                 }
 
-                // 脸部 (嘟嘴检测)
-                const faceRes = faceLandmarker.detectForVideo(video, performance.now());
-                if (faceRes.faceBlendshapes.length > 0 && !state.isBlown) {
-                    const pucker = faceRes.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
-                    if (pucker > CONFIG.blowThreshold) {
+                // 吹气
+                if(face.faceBlendshapes.length > 0 && !state.isBlown) {
+                    const pucker = face.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
+                    if(pucker > 0.5) {
                         puckerCounter++;
-                        if (puckerCounter > CONFIG.blowDuration) triggerBlow();
+                        if(puckerCounter > 10) triggerBlow(); // 持续嘟嘴触发
                     } else {
-                        puckerCounter = Math.max(0, puckerCounter - 1);
+                        puckerCounter = 0;
                     }
                 }
+            } else if (!state.useAI) {
+                // 自动旋转 (无AI模式)
+                state.rotation += 0.005;
             }
 
-            // --- 粒子物理模拟 ---
+            // 粒子物理
             const pos = particles.geometry.attributes.position.array;
-            
-            // 确定目标状态
-            let targetBuffer;
-            if (state.mode === 'TEXT') targetBuffer = particleData.text;
-            else if (state.mode === 'CAKE') targetBuffer = particleData.cake;
-            
-            for (let i = 0; i < CONFIG.count; i++) {
-                const i3 = i * 3;
-                
-                if (state.mode === 'SCATTER') {
-                    // 散开模式：基于噪波的漂浮
-                    pos[i3] += Math.sin(time + particleData.noiseOffsets[i]) * 0.05;
-                    pos[i3+1] += Math.cos(time + particleData.noiseOffsets[i] * 0.5) * 0.05;
-                    pos[i3+2] += Math.sin(time * 0.5 + particleData.noiseOffsets[i]) * 0.05;
-                } else {
-                    // 聚合/文字模式：飞向目标
-                    const tx = targetBuffer[i3];
-                    const ty = targetBuffer[i3+1];
-                    const tz = targetBuffer[i3+2];
-                    
-                    // 增加螺旋飞行效果 (Curl Noise 模拟)
-                    const speed = state.isBlown ? 0.04 : 0.08; // 吹气时飞得慢一点，更唯美
-                    
-                    pos[i3] += (tx - pos[i3]) * speed;
-                    pos[i3+1] += (ty - pos[i3+1]) * speed;
-                    pos[i3+2] += (tz - pos[i3+2]) * speed;
+            let target;
+            if(state.mode === 'TEXT') target = particleData.text;
+            else if(state.mode === 'CAKE') target = particleData.cake;
 
-                    // 增加一点微弱的波动，让文字和蛋糕看起来是“活”的
-                    if (Math.abs(tx - pos[i3]) < 0.1) {
-                        pos[i3] += Math.sin(time * 2 + particleData.noiseOffsets[i]) * 0.01;
-                        pos[i3+1] += Math.cos(time * 3 + particleData.noiseOffsets[i]) * 0.01;
+            for(let i=0; i<CONFIG.count; i++) {
+                const i3 = i*3;
+                if(state.mode === 'SCATTER') {
+                    pos[i3] += Math.sin(time + particleData.noise[i])*0.05;
+                    pos[i3+1] += Math.cos(time + particleData.noise[i])*0.05;
+                    pos[i3+2] += Math.sin(time*0.5 + particleData.noise[i])*0.05;
+                } else {
+                    const lerp = state.isBlown ? 0.05 : 0.1;
+                    pos[i3] += (target[i3] - pos[i3]) * lerp;
+                    pos[i3+1] += (target[i3+1] - pos[i3+1]) * lerp;
+                    pos[i3+2] += (target[i3+2] - pos[i3+2]) * lerp;
+                    
+                    // 悬浮微动
+                    if(state.mode === 'TEXT') {
+                        pos[i3] += Math.sin(time*3 + particleData.noise[i])*0.005;
                     }
                 }
             }
-
+            
             particles.geometry.attributes.position.needsUpdate = true;
-            particles.rotation.y = THREE.MathUtils.lerp(particles.rotation.y, state.rotation, 0.05);
-
+            particles.rotation.y = THREE.MathUtils.lerp(particles.rotation.y, state.rotation, 0.1);
+            
             composer.render();
         }
 
-        function onWindowResize() {
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             composer.setSize(window.innerWidth, window.innerHeight);
-        }
+        });
 
         init();
     </script>
