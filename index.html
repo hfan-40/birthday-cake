@@ -3,26 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold Ultimate Cinematic Cake</title>
+    <title>Rose Gold Ultimate 666 - Instanced Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Times New Roman', serif; }
+        body { margin: 0; overflow: hidden; background: #0a080a; font-family: 'Times New Roman', serif; }
         #loader { 
             position: fixed; inset: 0; background: #000; z-index: 100; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            color: #FFD1DC; letter-spacing: 5px; transition: opacity 1s; 
+            color: #FFB6C1; letter-spacing: 5px; transition: opacity 0.8s; 
         }
-        .spinner { width: 50px; height: 50px; border: 3px solid rgba(255,143,163,0.2); border-top-color: #D4AF37; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .spinner { width: 50px; height: 50px; border: 2px solid rgba(255,182,193,0.1); border-top-color: #D4AF37; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #D4AF37; pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); font-weight: bold; letter-spacing: 2px; }
+        #ui-hint { position: absolute; bottom: 40px; width: 100%; text-align: center; color: #D4AF37; pointer-events: none; z-index: 10; text-shadow: 0 0 20px rgba(0,0,0,0.9); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="spinner"></div>
-        <div id="load-text">LUXURY RENDERING...</div>
+        <div id="status">INSTANCING GPU MEMORY...</div>
     </div>
-    <div id="ui">✨ 双手张开：魔法爆发 | 嘟嘴：吹灭蜡烛 ✨</div>
+
+    <div id="ui-hint">
+        Mirror Control: 👋 Rotate | 👐 Magic Burst | 😗 Blow Out
+    </div>
+
+    <video id="webcam" style="display:none;" playsinline></video>
 
     <script type="importmap">
         {
@@ -42,119 +47,129 @@
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
-        // --- 核心配置 ---
         const CONFIG = {
-            count: 300,
+            total: 666,
             colors: {
-                rose: 0xE5B3A6,  // 优化后的精致玫瑰粉
-                gold: 0xD4AF37,  // 经典金属金
-                ivory: 0xFFFFF0, // 象牙白
-                flame: 0xFF4500
+                rose: new THREE.Color(0xFFB6C1),  // 精致玫瑰粉
+                ivory: new THREE.Color(0xFFFFF5), // 暖象牙白
+                gold: new THREE.Color(0xD4AF37)   // 绸缎金
             },
-            lerpSpeed: 0.1,      // AI 平滑系数
-            magicStrength: 0.15  // 过渡抖动强度
+            particleScale: 1.4
         };
 
-        let scene, camera, renderer, composer, mainGroup, bloomPass;
+        let scene, camera, renderer, composer, bloomPass, mainGroup;
         let handLandmarker, faceLandmarker, video;
-        let particles = [], flameObj = null;
-        let state = { rotation: 0, isBlown: false, step: 0 }; // 0: 蛋糕, 1: 爆发
+        let iMeshes = [], particleData = [];
+        let flame, candle;
+        let state = { rotY: 0, explode: 0, blown: false, frame: 0 };
+        const dummy = new THREE.Object3D();
 
         async function init() {
-            // 场景与相机
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 12, 50);
+            camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 18, 70);
 
-            // 渲染器增强
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMapping = THREE.ReinhardToneMapping; // 更有电影质感的色调映射
             renderer.toneMappingExposure = 1.2;
             document.body.appendChild(renderer.domElement);
 
-            // 1. 视觉抛光：环境映射 (EnvMap)
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-            // 2. 电影感后期：辉光与光晕
-            const renderScene = new RenderPass(scene, camera);
-            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.3, 0.8);
+            const renderPass = new RenderPass(scene, camera);
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
+            composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            createUltimateCake();
+            setupInstancedCake();
             await setupAI();
-            
+
             document.getElementById('loader').style.opacity = 0;
-            setTimeout(() => document.getElementById('loader').remove(), 1000);
             animate();
         }
 
-        function createUltimateCake() {
-            // 几何体定义 (问题一：移除爱心，改为立方体组合)
+        function setupInstancedCake() {
+            // 问题一：几何体重构
             const geos = [
-                new THREE.SphereGeometry(0.7, 24, 24),
-                new THREE.BoxGeometry(1, 1, 1),
-                new THREE.CylinderGeometry(0.3, 0.3, 2, 12), // 糖果
-                new THREE.ConeGeometry(0.7, 1.2, 4)           // 三棱锥
+                new THREE.SphereGeometry(0.6, 24, 24),
+                new THREE.BoxGeometry(0.9, 0.9, 0.9),
+                new THREE.CylinderGeometry(0.2, 0.2, 2.2, 12),
+                new THREE.ConeGeometry(0.8, 1.5, 3) 
             ];
 
-            const mats = {
-                rose: new THREE.MeshPhysicalMaterial({ color: CONFIG.colors.rose, metalness: 0.2, roughness: 0.2, clearcoat: 1.0 }),
-                gold: new THREE.MeshStandardMaterial({ color: CONFIG.colors.gold, metalness: 1.0, roughness: 0.1, envMapIntensity: 2.5 }),
-                ivory: new THREE.MeshStandardMaterial({ color: CONFIG.colors.ivory, roughness: 0.8 })
-            };
+            // 材质：物理高级感
+            const baseMat = new THREE.MeshPhysicalMaterial({ 
+                metalness: 0.2, roughness: 0.15, clearcoat: 1.0, envMapIntensity: 1.5 
+            });
 
-            for (let i = 0; i < CONFIG.count; i++) {
-                const isTop = i > CONFIG.count * 0.5;
-                const isBow = i < 40; 
-                
-                const g = geos[Math.floor(Math.random() * geos.length)];
-                let m = isTop ? mats.rose : mats.ivory;
-                if (Math.random() > 0.8 || isBow) m = mats.gold;
+            // 为 4 种形状创建实例化网格
+            const countPerGeo = Math.ceil(CONFIG.total / geos.length);
+            geos.forEach((geo, gIdx) => {
+                const im = new THREE.InstancedMesh(geo, baseMat.clone(), countPerGeo);
+                im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                mainGroup.add(im);
+                iMeshes.push(im);
+            });
 
-                const mesh = new THREE.Mesh(g, m);
-                
-                // 布局算法：增大缝隙与体量
-                let targetPos = new THREE.Vector3();
+            // 预计算分布
+            for (let i = 0; i < CONFIG.total; i++) {
+                const gIdx = i % geos.length;
+                const iIdx = Math.floor(i / geos.length);
+                const isTop = i > CONFIG.total * 0.45;
+                const isBow = i < 60; // 蝴蝶结粒子数
+
+                let color = isTop ? CONFIG.colors.rose : CONFIG.colors.ivory;
+                if (Math.random() > 0.82 || isBow) color = CONFIG.colors.gold;
+
+                const pos = new THREE.Vector3();
                 if (isBow) {
+                    // 问题二：蝴蝶结算法 (数学模拟蝶形线)
                     const side = i % 2 === 0 ? 1 : -1;
-                    targetPos.set(side * 10, -3 + Math.random(), 9.5);
+                    const t = (i / 60) * Math.PI * 2;
+                    pos.set(
+                        side * (12 + Math.sin(t) * 3), 
+                        -4 + Math.cos(t) * 4, 
+                        16 + Math.sin(t * 2) * 2
+                    );
                 } else {
-                    const radius = isTop ? 7 + Math.random() * 2 : 10 + Math.random() * 2;
-                    const angle = Math.random() * Math.PI * 2;
-                    targetPos.set(Math.cos(angle) * radius, isTop ? 5 + Math.random() * 5 : -5 + Math.random() * 10, Math.sin(angle) * radius);
+                    const r = isTop ? 13 + Math.random() * 3 : 18 + Math.random() * 3;
+                    const theta = Math.random() * Math.PI * 2;
+                    pos.set(Math.cos(theta) * r, isTop ? 6 + Math.random() * 8 : -8 + Math.random() * 14, Math.sin(theta) * r);
                 }
 
-                mesh.position.copy(targetPos);
-                mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
-                mainGroup.add(mesh);
-
-                particles.push({ 
-                    mesh, 
-                    target: targetPos.clone(), 
-                    origin: targetPos.clone(), 
-                    noiseSeed: Math.random() * 100 
+                particleData.push({
+                    gIdx, iIdx,
+                    pos: pos.clone(),
+                    origin: pos.clone(),
+                    rot: new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6),
+                    vRot: new THREE.Vector3(Math.random() * 0.02, Math.random() * 0.02, Math.random() * 0.02)
                 });
+
+                iMeshes[gIdx].setColorAt(iIdx, color);
             }
 
-            // 蜡烛与火焰
-            const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 6, 16), mats.ivory);
-            candle.position.set(0, 12, 0);
+            // 蜡烛
+            candle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10, 20), baseMat.clone());
+            candle.position.set(0, 18, 0);
+            candle.material.color.copy(CONFIG.colors.ivory);
             mainGroup.add(candle);
 
-            const flameGeo = new THREE.LatheGeometry([
-                new THREE.Vector2(0, 0), new THREE.Vector2(0.5, 0.3), new THREE.Vector2(0.3, 1.2), new THREE.Vector2(0, 1.5)
-            ], 16);
-            const flameMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4400, emissiveIntensity: 4 });
-            flameObj = new THREE.Mesh(flameGeo, flameMat);
-            flameObj.position.set(0, 3.5, 0);
-            candle.add(flameObj);
+            // 问题三：火焰形状 (Lathe)
+            const points = [];
+            for (let i = 0; i < 10; i++) {
+                points.push(new THREE.Vector2(Math.sin(i * 0.3) * 0.6 * (1 - i / 10), i * 0.4));
+            }
+            const fGeo = new THREE.LatheGeometry(points, 20);
+            const fMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4500, emissiveIntensity: 6 });
+            flame = new THREE.Mesh(fGeo, fMat);
+            flame.position.set(0, 5.5, 0);
+            candle.add(flame);
         }
 
         async function setupAI() {
@@ -167,77 +182,93 @@
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
                 runningMode: "VIDEO", outputFaceBlendshapes: true
             });
-            video = document.createElement('video');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video = document.getElementById('webcam');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
             video.srcObject = stream;
             video.play();
             return new Promise(res => video.onloadeddata = res);
         }
 
         function animate() {
-            requestAnimationFrame(animate);
+            state.frame++;
             const time = performance.now() * 0.001;
+            requestAnimationFrame(animate);
 
             if (video.readyState >= 2) {
-                const hResults = handLandmarker.detectForVideo(video, performance.now());
-                const fResults = faceLandmarker.detectForVideo(video, performance.now());
+                const hRes = handLandmarker.detectForVideo(video, performance.now());
+                const fRes = faceLandmarker.detectForVideo(video, performance.now());
 
-                // 1. 体验：平滑 AI 过渡 (Lerp)
-                if (hResults.landmarks.length > 0) {
-                    const targetRot = (hResults.landmarks[0][9].x - 0.5) * 4;
-                    state.rotation = THREE.MathUtils.lerp(state.rotation, targetRot, CONFIG.lerpSpeed);
+                // 交互一：平滑旋转
+                if (hRes.landmarks.length > 0) {
+                    const x = hRes.landmarks[0][9].x;
+                    state.rotY = THREE.MathUtils.lerp(state.rotY, (x - 0.5) * 4, 0.1);
                     
-                    // 烟花爆发逻辑
-                    if (hResults.landmarks.length === 2) {
-                        const d = Math.hypot(hResults.landmarks[0][9].x - hResults.landmarks[1][9].x);
-                        if (d > 0.6) {
-                            state.step = 1;
-                            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 3.0, 0.2);
-                        } else {
-                            state.step = 0;
-                            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.8, 0.1);
-                        }
+                    // 交互二：魔法爆发
+                    if (hRes.landmarks.length === 2) {
+                        const d = Math.hypot(hRes.landmarks[0][9].x - hRes.landmarks[1][9].x, hRes.landmarks[0][9].y - hRes.landmarks[1][9].y);
+                        state.explode = THREE.MathUtils.lerp(state.explode, d > 0.55 ? 1 : 0, 0.1);
                     }
                 }
 
-                if (fResults.faceBlendshapes.length > 0) {
-                    const pucker = fResults.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
-                    if (pucker > 0.45) state.isBlown = true;
+                // 交互三：吹灭
+                if (fRes.faceBlendshapes.length > 0) {
+                    const pucker = fRes.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
+                    if (pucker > 0.5) state.blown = true;
                 }
             }
 
-            mainGroup.rotation.y = state.rotation;
+            mainGroup.rotation.y = state.rotY;
 
-            // 2. 逻辑：粒子魔法过渡 (问题三：火焰始终向上)
-            if (flameObj) {
-                flameObj.rotation.y = -mainGroup.rotation.y; // 抵消父级旋转
-                flameObj.scale.setScalar(1 + Math.sin(time * 12) * 0.1);
-                if (state.isBlown) flameObj.visible = false;
+            // 问题三：火焰方向补偿 (关键：使用世界四元数反转)
+            if (flame) {
+                flame.quaternion.copy(mainGroup.quaternion).invert();
+                flame.scale.setScalar(1 + Math.sin(time * 20) * 0.1);
+                if (state.blown) {
+                    flame.visible = false;
+                    candle.material.emissiveIntensity = 0;
+                }
             }
 
-            particles.forEach((p, i) => {
-                // 3. 魔法偏移 (Noise offset during transition)
-                const magicOffset = state.step === 1 ? Math.sin(time * 2 + p.noiseSeed) * 15 : 0;
-                const targetY = state.step === 1 ? p.origin.y + 20 : p.origin.y;
+            // 更新实例化粒子
+            particleData.forEach((p, idx) => {
+                const { gIdx, iIdx, origin, rot, vRot } = p;
                 
-                p.mesh.position.x += (p.origin.x - p.mesh.position.x) * 0.05 + Math.cos(time + i) * magicOffset * 0.01;
-                p.mesh.position.y += (targetY - p.mesh.position.y) * 0.05;
-                p.mesh.position.z += (p.origin.z - p.mesh.position.z) * 0.05;
+                // 魔法动力学：爆炸 + 呼吸浮动
+                const noise = Math.sin(time * 2 + idx) * 0.5;
+                const explodePower = state.explode * 30;
                 
-                p.mesh.rotation.x += 0.01;
-                p.mesh.rotation.z += 0.01;
+                dummy.position.x = origin.x + (origin.x * state.explode * 1.5) + Math.cos(idx) * noise;
+                dummy.position.y = origin.y + (state.explode * 20) + noise;
+                dummy.position.z = origin.z + (origin.z * state.explode * 1.5) + Math.sin(idx) * noise;
+
+                rot.x += vRot.x; rot.y += vRot.y;
+                dummy.rotation.copy(rot);
+
+                const s = CONFIG.particleScale * (1 - state.explode * 0.3);
+                dummy.scale.set(s, s, s);
+                
+                dummy.updateMatrix();
+                iMeshes[gIdx].setMatrixAt(iIdx, dummy.matrix);
             });
+
+            iMeshes.forEach(im => im.instanceMatrix.needsUpdate = true);
+            
+            // 辉光动态
+            if (!state.blown) {
+                bloomPass.strength = 1.2 + Math.sin(time * 3) * 0.3 + (state.explode * 2);
+            }
 
             composer.render();
         }
 
-        init();
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             composer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        init();
     </script>
 </body>
 </html>
