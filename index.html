@@ -2,587 +2,316 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold: Ethereal Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 魔法生日蛋糕</title>
     <style>
-        :root {
-            --primary: #EAB8C2; /* Sakura Pink */
-            --accent: #FFFFFF;
-            --dark: #5D4037;
-            --glass: rgba(255, 255, 255, 0.15);
-            --border: rgba(255, 255, 255, 0.3);
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        #ui {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+            user-select: none;
+            font-size: 18px;
+            letter-spacing: 2px;
         }
-
-        body { 
-            margin: 0; overflow: hidden; 
-            background: radial-gradient(circle at center, #FDFBFB 0%, #EBEDEE 100%);
-            font-family: 'Montserrat', sans-serif; 
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
         }
-
-        /* UI Layer - Minimalist & Glassmorphism */
-        #ui-layer {
-            position: absolute; inset: 0; pointer-events: none; z-index: 20;
-            display: flex; flex-direction: column; justify-content: space-between; align-items: center;
-            padding: 4vh;
-        }
-
-        .hud-panel {
-            background: var(--glass);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            padding: 12px 28px; border-radius: 40px;
-            box-shadow: 0 10px 40px rgba(234, 184, 194, 0.15);
-            display: flex; align-items: center; gap: 12px;
-            transform: translateY(20px); opacity: 0; transition: 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .hud-panel.active { transform: translateY(0); opacity: 1; }
-
-        .status-dot {
-            width: 8px; height: 8px; border-radius: 50%; background: #ccc;
-            box-shadow: 0 0 0 2px rgba(255,255,255,0.5); transition: 0.4s;
-        }
-        .status-dot.ready { background: #00E676; box-shadow: 0 0 15px #00E676; }
-
-        .text-main { color: var(--dark); font-weight: 600; letter-spacing: 1px; font-size: 14px; }
-        .text-sub { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
-
-        /* Fullscreen Fab */
-        #fs-btn {
-            position: absolute; top: 30px; right: 30px; pointer-events: auto; cursor: pointer;
-            width: 48px; height: 48px; border-radius: 16px;
-            background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s; color: var(--dark);
-        }
-        #fs-btn:active { transform: scale(0.9); }
-
-        /* Loader */
-        #loader {
-            position: fixed; inset: 0; background: #fff; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.8s;
-        }
-        .spinner {
-            width: 60px; height: 60px; border: 3px solid rgba(234, 184, 194, 0.2);
-            border-top-color: var(--primary); border-radius: 50%;
-            animation: spin 1s infinite linear;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Montserrat:wght@400;600;800&display=swap');
     </style>
-</head>
-<body>
-
-    <div id="loader">
-        <div class="spinner"></div>
-        <p style="margin-top:20px; color:#aaa; font-size:12px; letter-spacing:2px;">SCULPTING PARTICLES</p>
-    </div>
-
-    <div id="ui-layer">
-        <div id="fs-btn">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        </div>
-
-        <div class="hud-panel active" style="margin-top: auto;">
-            <div class="status-dot" id="ai-status"></div>
-            <div>
-                <div class="text-main" id="instruction">Loading Vision Core...</div>
-                <div class="text-sub" id="mode-label">SYSTEM INIT</div>
-            </div>
-        </div>
-    </div>
-
-    <video id="webcam" autoplay playsinline style="display:none;"></video>
-
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs"
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
     </script>
+</head>
+<body>
+
+    <div id="loading">加载资源中...</div>
+    <div id="canvas-container"></div>
+    <div id="ui">点击屏幕 / 张开手掌 许愿</div>
 
     <script type="module">
         import * as THREE from 'three';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-        import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- MASTER CONFIGURATION ---
+        // --- 配置参数 ---
         const CONFIG = {
-            count: 3200, // 粒子数量
-            particleSize: 0.65, // 粒子增大，增强视觉张力
-            colors: {
-                pink: new THREE.Color(0xFFC4D0).convertSRGBToLinear(), // 高级灰粉
-                white: new THREE.Color(0xF5F5F5).convertSRGBToLinear(), // 陶瓷白
-                gold: new THREE.Color(0xE6C898).convertSRGBToLinear()   // 香槟金点缀
-            },
-            physics: {
-                damp: 0.93,          // 高阻尼 = 丝滑感 (0.9-0.95)
-                returnForce: 0.04,   // 回归目标的力度
-                handRepel: 3.0,      // 手势排斥强度
-                handRadius: 12.0     // 手势影响半径
-            }
+            count: 2000,          // 粒子数量
+            cakeRadius: 2.5,
+            cakeHeight: 4.0,
+            scatterRadius: 12.0,
+            colors: ['#FFD700', '#FF3366', '#33CCFF', '#FFFFFF', '#FFAA00']
         };
 
-        // --- STATE MANAGEMENT ---
-        const state = {
-            phase: 'CAKE', // CAKE, TEXT, EXPLODE
-            aiReady: false,
-            handPos: new THREE.Vector3(1000, 1000, 1000), // 默认在屏幕外
-            handSmoothed: new THREE.Vector3(1000, 1000, 1000),
-            puckerScore: 0,
-            handSpread: 0,
-            time: 0
-        };
+        // --- Shader (视觉核心) ---
+        // 这里的 Shader 与之前的完全一致，负责物理渲染和形状变换
+        const vertexShader = `
+            precision highp float;
+            uniform float uTime;
+            uniform float uExpansion; // 0.0 = 蛋糕, 1.0 = 散开
 
-        // --- THREE.JS GLOBALS ---
-        let scene, camera, renderer, composer;
-        let mainGroup, particlesMesh, flameMesh;
-        let dummy = new THREE.Object3D();
-        
-        // --- DATA BUFFERS ---
-        // 使用 Float32Array 获得原生性能
-        const pData = {
-            pos: new Float32Array(CONFIG.count * 3),
-            vel: new Float32Array(CONFIG.count * 3),
-            target: new Float32Array(CONFIG.count * 3), // 当前目标点
-            noise: new Float32Array(CONFIG.count),
-            type: new Uint8Array(CONFIG.count), // 0:Body, 1:Wick, 2:Flame
-            meshIdx: new Uint8Array(CONFIG.count)
-        };
+            attribute vec3 aPosCake;
+            attribute vec3 aPosScatter;
+            attribute float aSpeed;
+            
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
 
-        // 预计算的目标点集合
-        const targets = {
-            cake: new Float32Array(CONFIG.count * 3),
-            text: new Float32Array(CONFIG.count * 3),
-            explode: new Float32Array(CONFIG.count * 3)
-        };
-
-        // --- INITIALIZATION ---
-        async function init() {
-            initThree();
-            initParticles();
-            initTargets();
-            setupUI();
-
-            try {
-                await initAI();
-                state.aiReady = true;
-                document.getElementById('ai-status').classList.add('ready');
-                updateHUD("Pucker to Blow • Open to Burst", "INTERACTIVE MODE");
-            } catch (e) {
-                console.warn("AI Init Failed", e);
-                setupMouseFallback();
-                updateHUD("Click to Interact", "MOUSE MODE");
+            // 缓动函数：BackOut (让炸开有弹射感)
+            float easeOutBack(float x) {
+                float c1 = 1.70158;
+                float c3 = c1 + 1.0;
+                return 1.0 + c3 * pow(x - 1.0, 3.0) + c1 * pow(x - 1.0, 2.0);
             }
 
-            document.getElementById('loader').style.opacity = 0;
-            setTimeout(() => document.getElementById('loader').remove(), 1000);
-            
-            animate();
-        }
+            void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vColor = instanceColor;
 
-        // --- 1. VISUAL ENGINE (High-End Rendering) ---
-        function initThree() {
-            scene = new THREE.Scene();
-            // 极简的高级背景雾效
-            scene.fog = new THREE.FogExp2(0xFFFBFB, 0.015);
-
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 3, 50);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; // 电影级色调映射
-            renderer.toneMappingExposure = 1.2;
-            document.body.appendChild(renderer.domElement);
-
-            // 环境光照 (IBL)
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-
-            // 补光
-            const softLight = new THREE.DirectionalLight(0xFFEBEB, 1.5);
-            softLight.position.set(10, 20, 10);
-            scene.add(softLight);
-
-            mainGroup = new THREE.Group();
-            scene.add(mainGroup);
-
-            // 后期处理 (柔光 Bloom)
-            composer = new EffectComposer(renderer);
-            const renderPass = new RenderPass(scene, camera);
-            composer.addPass(renderPass);
-            
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.85; // 只有极亮部分发光 (如火焰)
-            bloomPass.strength = 0.6;
-            bloomPass.radius = 0.3;
-            composer.addPass(bloomPass);
-        }
-
-        // --- 2. PARTICLE SYSTEM (Geometry & Material) ---
-        function initParticles() {
-            // 混合几何体：增加视觉丰富度
-            const geoSphere = new THREE.SphereGeometry(CONFIG.particleSize, 16, 16);
-            const geoBox = new THREE.BoxGeometry(CONFIG.particleSize, CONFIG.particleSize, CONFIG.particleSize);
-            const geoCapsule = new THREE.CapsuleGeometry(CONFIG.particleSize * 0.4, CONFIG.particleSize, 4, 8);
-
-            // PBR 材质：磨砂玻璃感
-            const matPink = new THREE.MeshPhysicalMaterial({
-                color: CONFIG.colors.pink, roughness: 0.2, metalness: 0.1, 
-                transmission: 0.2, clearcoat: 1.0, clearcoatRoughness: 0.1
-            });
-            const matWhite = new THREE.MeshPhysicalMaterial({
-                color: CONFIG.colors.white, roughness: 0.3, metalness: 0.1
-            });
-            const matGold = new THREE.MeshPhysicalMaterial({
-                color: CONFIG.colors.gold, roughness: 0.1, metalness: 0.8
-            });
-            const matFlame = new THREE.MeshBasicMaterial({ color: 0xFF7F50 });
-
-            // 创建 InstancedMeshes
-            const meshes = [
-                new THREE.InstancedMesh(geoSphere, matWhite, CONFIG.count),
-                new THREE.InstancedMesh(geoBox, matPink, CONFIG.count),
-                new THREE.InstancedMesh(geoCapsule, matGold, CONFIG.count)
-            ];
-
-            meshes.forEach((m, i) => {
-                m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mainGroup.add(m);
-            });
-            state.meshes = meshes;
-
-            // 独立的火焰 Mesh
-            flameMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 8, 8), matFlame, 100);
-            mainGroup.add(flameMesh);
-
-            // 初始化数据
-            for(let i=0; i<CONFIG.count; i++) {
-                pData.noise[i] = Math.random();
-                // 随机分配几何体和颜色
-                const rnd = Math.random();
-                pData.meshIdx[i] = rnd > 0.6 ? 1 : (rnd > 0.2 ? 0 : 2); // Pink, White, Gold mix
+                // 状态混合
+                float t = smoothstep(0.0, 1.0, uExpansion);
+                float morphFactor = mix(t, easeOutBack(t), 0.6); 
                 
-                // 类型定义 (火焰/烛芯/身体)
-                if (i >= CONFIG.count - 8) pData.type[i] = 2; // Flame
-                else if (i >= CONFIG.count - 50) pData.type[i] = 1; // Wick
-                else pData.type[i] = 0; // Body
+                vec3 targetPos = mix(aPosCake, aPosScatter, morphFactor);
 
-                // 初始位置随机
-                pData.pos[i*3] = (Math.random()-0.5) * 50;
-                pData.pos[i*3+1] = (Math.random()-0.5) * 50;
-                pData.pos[i*3+2] = (Math.random()-0.5) * 50;
+                // 散开时的漂浮噪点
+                if (uExpansion > 0.01) {
+                    targetPos.x += sin(uTime * aSpeed + targetPos.y) * 0.2 * uExpansion;
+                    targetPos.y += cos(uTime * aSpeed * 0.8 + targetPos.x) * 0.2 * uExpansion;
+                }
+
+                vec4 mvPosition = modelViewMatrix * vec4(targetPos, 1.0);
+                vViewPosition = -mvPosition.xyz;
+                gl_Position = projectionMatrix * mvPosition;
             }
+        `;
+
+        const fragmentShader = `
+            precision highp float;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+
+            void main() {
+                vec3 normal = normalize(vNormal);
+                vec3 viewDir = normalize(vViewPosition);
+                vec3 lightDir = normalize(vec3(0.5, 0.8, 0.5)); 
+                
+                // 漫反射
+                float diff = max(dot(normal, lightDir), 0.0);
+                
+                // 高光 (光泽感)
+                vec3 halfwayDir = normalize(lightDir + viewDir);
+                float spec = pow(max(dot(normal, halfwayDir), 0.0), 64.0);
+                
+                // 边缘光
+                float rim = 1.0 - max(dot(viewDir, normal), 0.0);
+                rim = pow(rim, 3.0) * 0.5;
+
+                // 组合
+                vec3 ambient = vec3(0.1);
+                vec3 finalColor = vColor * (ambient + diff) + vec3(0.8) * spec + vec3(0.3) * rim;
+
+                // Tone Mapping (防止过曝)
+                finalColor = finalColor / (finalColor + vec3(1.0));
+                finalColor = pow(finalColor, vec3(1.0 / 2.2));
+
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        // --- 初始化场景 ---
+        const container = document.getElementById('canvas-container');
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#050505');
+
+        const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 18);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 0.5;
+
+        // --- 生成粒子数据 ---
+        const geometry = new THREE.SphereGeometry(0.12, 16, 16); // 基础球体
+        const instancedGeo = new THREE.InstancedBufferGeometry();
+        instancedGeo.index = geometry.index;
+        instancedGeo.attributes.position = geometry.attributes.position;
+        instancedGeo.attributes.normal = geometry.attributes.normal;
+        instancedGeo.attributes.uv = geometry.attributes.uv;
+
+        const count = CONFIG.count;
+        const posCake = new Float32Array(count * 3);
+        const posScatter = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const speeds = new Float32Array(count);
+
+        const palette = CONFIG.colors.map(c => new THREE.Color(c));
+
+        for (let i = 0; i < count; i++) {
+            // A. 蛋糕位置
+            const r = Math.random() * CONFIG.cakeRadius;
+            const theta = i * 0.5;
+            const y = (i / count) * CONFIG.cakeHeight - (CONFIG.cakeHeight / 2);
+            // 修正圆柱表面
+            const rSurface = CONFIG.cakeRadius * (1.0 - (y + 2.0)/8.0);
+            
+            posCake[i*3] = Math.cos(theta) * rSurface;
+            posCake[i*3+1] = y;
+            posCake[i*3+2] = Math.sin(theta) * rSurface;
+
+            // B. 散开位置
+            const phi = Math.acos(-1 + (2 * i) / count);
+            const sq = Math.sqrt(count * Math.PI * phi);
+            const rScatter = CONFIG.scatterRadius;
+            
+            posScatter[i*3] = rScatter * Math.cos(sq) * Math.sin(phi);
+            posScatter[i*3+1] = rScatter * Math.sin(sq) * Math.sin(phi);
+            posScatter[i*3+2] = rScatter * Math.cos(phi);
+
+            // C. 颜色
+            const color = palette[Math.floor(Math.random() * palette.length)];
+            colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
+            
+            speeds[i] = Math.random() * 0.5 + 0.5;
         }
 
-        // --- 3. TARGET GENERATION (The Logic) ---
-        function initTargets() {
-            // A. CAKE SHAPE (Spiral Layers)
-            let idx = 0;
-            for(let i=0; i<CONFIG.count - 50; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const r = 5 + Math.random() * 6; // Radius 5-11
-                const h = (Math.random() - 0.5) * 8; // Height
-                targets.cake[idx*3] = Math.cos(angle)*r;
-                targets.cake[idx*3+1] = h;
-                targets.cake[idx*3+2] = Math.sin(angle)*r;
-                idx++;
-            }
-            // Candles (Top)
-            for(; idx<CONFIG.count; idx++) {
-                targets.cake[idx*3] = 0; 
-                targets.cake[idx*3+1] = 6 + Math.random()*3; 
-                targets.cake[idx*3+2] = 0;
-            }
+        instancedGeo.setAttribute('aPosCake', new THREE.InstancedBufferAttribute(posCake, 3));
+        instancedGeo.setAttribute('aPosScatter', new THREE.InstancedBufferAttribute(posScatter, 3));
+        instancedGeo.setAttribute('instanceColor', new THREE.InstancedBufferAttribute(colors, 3));
+        instancedGeo.setAttribute('aSpeed', new THREE.InstancedBufferAttribute(speeds, 1));
+        instancedGeo.instanceCount = count;
 
-            // B. TEXT SHAPE (Auto-Fit Logic)
-            const cvs = document.createElement('canvas');
-            cvs.width = 1000; cvs.height = 300;
-            const ctx = cvs.getContext('2d');
-            ctx.font = '900 150px "Montserrat"'; 
-            ctx.fillStyle = 'white'; ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText('HAPPY BIRTHDAY', 500, 150);
-            const imgData = ctx.getImageData(0,0,1000,300).data;
-            const valid = [];
-            for(let y=0; y<300; y+=5) for(let x=0; x<1000; x+=5) {
-                if(imgData[(y*1000+x)*4] > 128) valid.push({x:x-500, y:-(y-150)});
+        // --- 材质 ---
+        const material = new THREE.ShaderMaterial({
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            uniforms: {
+                uTime: { value: 0 },
+                uExpansion: { value: 0 }
             }
+        });
+
+        const mesh = new THREE.Mesh(instancedGeo, material);
+        scene.add(mesh);
+
+        // --- 简单的照片墙 (用 Sprite 模拟) ---
+        const photoGroup = new THREE.Group();
+        // 这里使用 picsum 作为占位图，实际使用时请替换为你的图片URL
+        const photoUrls = [
+            'https://picsum.photos/id/1011/200/300',
+            'https://picsum.photos/id/1015/200/300',
+            'https://picsum.photos/id/1025/200/300',
+            'https://picsum.photos/id/1027/200/300'
+        ];
+        
+        const textureLoader = new THREE.TextureLoader();
+        photoUrls.forEach((url, i) => {
+            textureLoader.load(url, (tex) => {
+                const aspect = tex.image.width / tex.image.height;
+                const photoGeo = new THREE.PlaneGeometry(1.5, 1.5 / aspect);
+                const photoMat = new THREE.MeshBasicMaterial({ 
+                    map: tex, 
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0 
+                });
+                const photo = new THREE.Mesh(photoGeo, photoMat);
+                
+                // 随机位置
+                photo.position.set(
+                    (Math.random() - 0.5) * 8,
+                    (Math.random() - 0.5) * 8,
+                    (Math.random() - 0.5) * 6
+                );
+                photo.rotation.z = (Math.random() - 0.5) * 0.5;
+                photoGroup.add(photo);
+            });
+        });
+        scene.add(photoGroup);
+        document.getElementById('loading').style.display = 'none';
+
+        // --- 动画循环与交互逻辑 ---
+        
+        // 状态变量
+        let state = {
+            targetExpansion: 0, // 0 = 蛋糕, 1 = 散开
+            currentExpansion: 0
+        };
+
+        // 交互：点击切换
+        const toggleState = () => {
+            state.targetExpansion = state.targetExpansion === 0 ? 1 : 0;
             
-            // 缩放适应屏幕 (视口宽度约为 40 units at Z=0)
-            const scale = 0.08; 
-            for(let i=0; i<CONFIG.count; i++) {
-                const p = valid[i % valid.length];
-                targets.text[i*3] = p.x * scale;
-                targets.text[i*3+1] = p.y * scale + 3; // 稍微抬高
-                targets.text[i*3+2] = (Math.random()-0.5)*2; // 增加一点Z轴厚度
-            }
-
-            // C. EXPLODE SHAPE (Controlled Chaos Sphere)
-            // 修复问题四：在画幅内固定位置
-            for(let i=0; i<CONFIG.count; i++) {
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const r = Math.random() * 25; // 限制在半径 25 内，确保在屏幕内
-                targets.explode[i*3] = r * Math.sin(phi) * Math.cos(theta);
-                targets.explode[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-                targets.explode[i*3+2] = r * Math.cos(phi);
-            }
+            // UI 更新
+            const uiText = state.targetExpansion === 0 ? "点击屏幕 / 张开手掌 许愿" : "点击屏幕 / 握拳 复原蛋糕";
+            document.getElementById('ui').innerText = uiText;
             
-            // 初始目标设为蛋糕
-            for(let i=0; i<CONFIG.count*3; i++) pData.target[i] = targets.cake[i];
-        }
+            // 散开时自动旋转，蛋糕时停止
+            controls.autoRotate = state.targetExpansion === 1;
+        };
 
-        // --- 4. PHYSICS & INTERACTION ENGINE ---
+        window.addEventListener('mousedown', toggleState);
+        window.addEventListener('touchstart', toggleState);
+
+        const clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
-            state.time += 0.015;
-
-            // AI Processing
-            if(state.aiReady) updateAI();
             
-            // Hand Smoothing (Kalman-ish filter)
-            state.handSmoothed.lerp(state.handPos, 0.15);
-
-            // Update Particle Physics
-            updatePhysics();
-
-            // Render
-            // mainGroup.rotation.y = Math.sin(state.time * 0.2) * 0.1; // 微妙的整体旋转
-            composer.render();
-        }
-
-        function updatePhysics() {
-            const counts = [0,0,0];
-            let flameCount = 0;
-            const p = pData.pos;
-            const v = pData.vel;
-            const t = pData.target;
-
-            // 手势数据预计算 (Optimization)
-            const hx = state.handSmoothed.x;
-            const hy = state.handSmoothed.y;
-            const hz = state.handSmoothed.z;
-            const repelRadSq = CONFIG.physics.handRadius * CONFIG.physics.handRadius;
-
-            for(let i=0; i<CONFIG.count; i++) {
-                const i3 = i * 3;
-                
-                // 1. 获取基础目标点
-                let tx = t[i3];
-                let ty = t[i3+1];
-                let tz = t[i3+2];
-
-                // 2. 状态特有动态 (Adding Life)
-                const noise = pData.noise[i];
-                if (state.phase === 'CAKE' && pData.type[i] === 2) {
-                    // 火焰摇曳
-                    ty += Math.sin(state.time * 20 + noise) * 0.5;
-                    tx += Math.cos(state.time * 10 + noise) * 0.2;
-                    // 吹气响应
-                    tx += (Math.random()-0.5) * state.puckerScore * 2;
-                } else if (state.phase === 'TEXT') {
-                    // 文字漂浮
-                    tx += Math.sin(state.time + noise) * 0.2;
-                    ty += Math.cos(state.time * 1.3 + noise) * 0.2;
-                }
-
-                // 3. 物理积分 (Velocity Verlet integration simplified)
-                // 吸引力 (Spring Force towards target)
-                v[i3]   += (tx - p[i3])   * CONFIG.physics.returnForce;
-                v[i3+1] += (ty - p[i3+1]) * CONFIG.physics.returnForce;
-                v[i3+2] += (tz - p[i3+2]) * CONFIG.physics.returnForce;
-
-                // 4. 手势交互 (Repulsion Force) - The Silky Part
-                const dx = p[i3] - hx;
-                const dy = p[i3+1] - hy;
-                const dz = p[i3+2] - hz;
-                const distSq = dx*dx + dy*dy + dz*dz;
-
-                if (distSq < repelRadSq) {
-                    const dist = Math.sqrt(distSq);
-                    const force = (1 - dist / CONFIG.physics.handRadius) * CONFIG.physics.handRepel;
-                    v[i3]   += (dx / dist) * force;
-                    v[i3+1] += (dy / dist) * force;
-                    v[i3+2] += (dz / dist) * force;
-                }
-
-                // 5. 阻尼 (Friction)
-                v[i3]   *= CONFIG.physics.damp;
-                v[i3+1] *= CONFIG.physics.damp;
-                v[i3+2] *= CONFIG.physics.damp;
-
-                // 6. 更新位置
-                p[i3]   += v[i3];
-                p[i3+1] += v[i3+1];
-                p[i3+2] += v[i3+2];
-
-                // 7. 更新矩阵
-                dummy.position.set(p[i3], p[i3+1], p[i3+2]);
-                
-                // 动态缩放
-                let s = 1;
-                if(pData.type[i] === 2) { // Flame
-                    s = (state.phase === 'CAKE') ? (1.0 + Math.sin(state.time*30)*0.3) * (1-state.puckerScore) : 0;
-                    dummy.rotation.set(0,0,0);
-                } else {
-                    dummy.rotation.set(state.time + noise, state.time + noise, 0);
-                    s = state.phase === 'TEXT' ? 0.7 : 1.0;
-                }
-                dummy.scale.set(s,s,s);
-                dummy.updateMatrix();
-
-                // 分配到 Mesh
-                if (pData.type[i] === 2) {
-                    flameMesh.setMatrixAt(flameCount++, dummy.matrix);
-                } else {
-                    const mIdx = pData.meshIdx[i];
-                    state.meshes[mIdx].setMatrixAt(counts[mIdx]++, dummy.matrix);
-                }
-            }
-
-            // 提交更新
-            flameMesh.count = flameCount; flameMesh.instanceMatrix.needsUpdate = true;
-            state.meshes.forEach((m, idx) => {
-                m.count = counts[idx]; m.instanceMatrix.needsUpdate = true;
-            });
-        }
-
-        // --- 5. AI & STATE LOGIC ---
-        let lastVidTime = -1;
-        let faceLM, handLM;
-
-        async function initAI() {
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-            handLM = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
-                runningMode: "VIDEO", numHands: 1
-            });
-            faceLM = await FaceLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
-                runningMode: "VIDEO", outputFaceBlendshapes: true
-            });
+            const time = clock.getElapsedTime();
             
-            const vid = document.getElementById('webcam');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            vid.srcObject = stream;
-            return new Promise(r => vid.onloadeddata = r);
-        }
+            // 1. 简单的弹簧物理模拟 (Lerp)
+            // 让 current 数值平滑地追赶 target 数值
+            const lerpSpeed = 0.05;
+            state.currentExpansion += (state.targetExpansion - state.currentExpansion) * lerpSpeed;
 
-        function updateAI() {
-            const vid = document.getElementById('webcam');
-            if(vid.currentTime === lastVidTime) return;
-            lastVidTime = vid.currentTime;
-            const now = performance.now();
+            // 2. 更新 Shader Uniforms
+            material.uniforms.uTime.value = time;
+            material.uniforms.uExpansion.value = state.currentExpansion;
 
-            const fRes = faceLM.detectForVideo(vid, now);
-            const hRes = handLM.detectForVideo(vid, now);
-
-            // 1. Blow Detection
-            if(fRes.faceBlendshapes.length > 0) {
-                const score = fRes.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
-                state.puckerScore = state.puckerScore * 0.8 + score * 0.2;
-                if(state.puckerScore > 0.5 && state.phase === 'CAKE') setPhase('TEXT');
-            }
-
-            // 2. Hand Logic
-            if(hRes.landmarks.length > 0) {
-                const lm = hRes.landmarks[0];
-                
-                // 映射坐标: Video [0,1] -> World [-25, 25]
-                // Y轴反转，Z轴反转
-                state.handPos.set(
-                    (0.5 - lm[9].x) * 60, // 增加范围
-                    (0.5 - lm[9].y) * 40, 
-                    (lm[9].z * -50) + 10
-                );
-
-                // Spread Detection
-                const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                state.handSpread = spread;
-
-                // State Triggers
-                if(spread > 0.55 && state.phase === 'CAKE') setPhase('EXPLODE');
-                if(spread < 0.25 && state.phase !== 'CAKE') setPhase('CAKE'); // Fist Reset
-            } else {
-                state.handPos.set(1000, 1000, 1000); // 移开
-            }
-        }
-
-        function setPhase(newPhase) {
-            if(state.phase === newPhase) return;
-            state.phase = newPhase;
-            
-            // 切换目标数组
-            const tArr = pData.target;
-            let src;
-            let label = "";
-            let sub = "";
-
-            if(newPhase === 'TEXT') {
-                src = targets.text;
-                label = "Happy Birthday"; sub = "Fist to Reset";
-            } else if(newPhase === 'EXPLODE') {
-                src = targets.explode;
-                label = "Magic Burst"; sub = "Fist to Reset";
-            } else {
-                src = targets.cake;
-                label = "Make a Wish"; sub = "Pucker or Open Hand";
-            }
-
-            updateHUD(sub, label);
-
-            // 平滑切换目标 (直接拷贝数据，物理引擎会处理过渡)
-            for(let i=0; i<CONFIG.count*3; i++) tArr[i] = src[i];
-        }
-
-        // --- UI & HELPERS ---
-        function updateHUD(main, sub) {
-            const h = document.getElementById('instruction');
-            const s = document.getElementById('mode-label');
-            h.style.opacity = 0; s.style.opacity = 0;
-            setTimeout(() => {
-                h.innerText = main; s.innerText = sub;
-                h.style.opacity = 1; s.style.opacity = 1;
-            }, 300);
-        }
-
-        function setupUI() {
-            document.getElementById('fs-btn').onclick = () => {
-                if(!document.fullscreenElement) document.documentElement.requestFullscreen();
-                else document.exitFullscreen();
-            };
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth/window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                composer.setSize(window.innerWidth, window.innerHeight);
+            // 3. 更新照片墙 (透明度和缩放)
+            // 只有当散开程度 > 0.8 时，照片才完全显现
+            const photoOpacity = Math.max(0, (state.currentExpansion - 0.5) * 2);
+            photoGroup.children.forEach(photo => {
+                photo.material.opacity = photoOpacity;
+                // 简单的缩放进场
+                const scale = 0.5 + 0.5 * photoOpacity;
+                photo.scale.set(scale, scale, scale);
+                // 漂浮动画
+                photo.position.y += Math.sin(time + photo.position.x) * 0.002;
             });
+
+            controls.update();
+            renderer.render(scene, camera);
         }
 
-        function setupMouseFallback() {
-            window.addEventListener('click', () => {
-                const next = state.phase === 'CAKE' ? 'TEXT' : (state.phase === 'TEXT' ? 'EXPLODE' : 'CAKE');
-                setPhase(next);
-            });
-            window.addEventListener('mousemove', (e) => {
-                state.handPos.set(
-                    (e.clientX/window.innerWidth - 0.5)*50,
-                    -(e.clientY/window.innerHeight - 0.5)*40,
-                    0
-                );
-            });
-        }
+        animate();
 
-        init();
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
     </script>
 </body>
 </html>
