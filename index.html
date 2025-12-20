@@ -3,29 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rose Gold Ultimate Luxury 3D</title>
+    <title>Rose Gold: Master Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #010101; font-family: 'Optima', 'Times New Roman', serif; }
-        #loader { 
-            position: fixed; inset: 0; background: #000; z-index: 100; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            color: #D4AF37; letter-spacing: 5px; transition: opacity 1.5s; 
+        :root { --gold: #E0BFB8; --rose: #B76E79; }
+        body { margin: 0; overflow: hidden; background: #050205; font-family: 'Cinzel', serif; }
+        
+        #ui-layer {
+            position: absolute; inset: 0; pointer-events: none; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            padding: 4vh 0 8vh 0;
         }
-        .spinner { width: 60px; height: 60px; border: 2px solid rgba(212,175,55,0.1); border-top: 2px solid #D4AF37; border-radius: 50%; animation: spin 1.2s infinite linear; margin-bottom: 25px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        #ui-hint { position: absolute; bottom: 40px; width: 100%; text-align: center; color: #FFB6C1; pointer-events: none; z-index: 10; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.8; }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            color: var(--gold); font-size: clamp(2rem, 5vw, 4rem); letter-spacing: 0.2em;
+            text-transform: uppercase; margin: 0; opacity: 0;
+            text-shadow: 0 0 30px rgba(183, 110, 121, 0.3);
+            transform: translateY(20px); transition: opacity 1.5s ease, transform 1.5s ease;
+        }
+        h1.visible { opacity: 1; transform: translateY(0); }
+
+        .glass-panel {
+            background: rgba(20, 10, 15, 0.4);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border-radius: 40px; padding: 12px 30px;
+            display: flex; align-items: center; gap: 12px;
+            transform: translateY(20px); opacity: 0; transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .glass-panel.visible { opacity: 1; transform: translateY(0); }
+
+        .status-indicator {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #555; box-shadow: 0 0 0 2px rgba(255,255,255,0.1);
+            transition: all 0.5s ease;
+        }
+        .status-indicator.active { background: #00FF9D; box-shadow: 0 0 10px #00FF9D, 0 0 0 2px rgba(255,255,255,0.2); }
+        
+        .hint-text {
+            color: #EFDFD0; font-size: 0.9rem; letter-spacing: 0.1em; font-weight: 300;
+        }
+
+        #loader {
+            position: fixed; inset: 0; background: #020102; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 1s ease;
+        }
+        .loader-ring {
+            width: 60px; height: 60px; border: 2px solid rgba(183, 110, 121, 0.2);
+            border-top: 2px solid var(--gold); border-radius: 50%;
+            animation: spin 1.2s infinite cubic-bezier(0.5, 0, 0.5, 1);
+        }
+
+        #webcam-preview {
+            position: absolute; bottom: 30px; right: 30px; width: 120px; height: 90px;
+            border-radius: 12px; opacity: 0; transform: scaleX(-1);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.5s; pointer-events: none;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
     </style>
 </head>
 <body>
 
     <div id="loader">
-        <div class="spinner"></div>
-        <div id="status">CRAFTING LUXURY SCENE...</div>
+        <div class="loader-ring"></div>
+        <p style="color: #664; margin-top: 20px; font-size: 0.8rem; letter-spacing: 2px;">INITIALIZING EXPERIENCE</p>
     </div>
 
-    <div id="ui-hint">✨ 👋 Rotate | 👐 Magic Burst | 😗 Blow Out ✨</div>
+    <div id="ui-layer">
+        <h1 id="main-title">Princess Celebration</h1>
+        
+        <div class="glass-panel" id="status-bar">
+            <div class="status-indicator" id="ai-dot"></div>
+            <span class="hint-text" id="guide-text">Loading AI Models...</span>
+        </div>
+    </div>
 
-    <video id="webcam" style="display:none;" playsinline></video>
+    <video id="webcam" autoplay playsinline style="display:none;"></video>
+    <canvas id="webcam-preview"></canvas>
 
     <script type="importmap">
         {
@@ -42,213 +101,544 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker } from '@mediapipe/tasks-vision';
 
+        // --- Configuration ---
         const CONFIG = {
-            total: 888, // 增加粒子数至 888，寓意吉祥且视觉丰满
+            count: 3500,
             colors: {
-                rose: new THREE.Color(0xFFC1CC).convertSRGBToLinear(),
-                ivory: new THREE.Color(0xFFFFF5).convertSRGBToLinear(),
-                gold: new THREE.Color(0xFFD700).convertSRGBToLinear()
+                roseGold: new THREE.Color(0xB76E79).convertSRGBToLinear(),
+                champagne: new THREE.Color(0xF7E7CE).convertSRGBToLinear(),
+                obsidian: new THREE.Color(0x1a1a1a).convertSRGBToLinear(),
+                ember: new THREE.Color(0xFF5500).convertSRGBToLinear()
+            },
+            physics: {
+                damp: 0.08,    // 阻尼系数，越小越顺滑
+                noiseSpeed: 0.3,
+                blowTrigger: 0.45
             }
         };
 
-        let scene, camera, renderer, composer, bloomPass, mainGroup;
-        let handLandmarker, faceLandmarker, video;
-        let iMeshes = [], particleData = [];
-        let flame, candle, flickerLight;
-        let state = { rotY: 0, explode: 0, blown: false };
-        const dummy = new THREE.Object3D();
+        // --- Global State ---
+        const state = {
+            phase: 'CAKE', // CAKE, SMOKE, TEXT, EXPLODE
+            aiReady: false,
+            puckerScore: 0,
+            handSpread: 0,
+            rotationTarget: 0,
+            rotationCurrent: 0,
+            time: 0
+        };
 
+        // --- Three.js Variables ---
+        let scene, camera, renderer, composer;
+        let mainGroup, instanceMesh;
+        let dummy = new THREE.Object3D();
+        let _position = new THREE.Vector3();
+        let _quaternion = new THREE.Quaternion();
+        let _scale = new THREE.Vector3();
+        
+        // --- Data Buffers ---
+        // 使用 Float32Array 获得极致性能
+        const particles = {
+            pos: new Float32Array(CONFIG.count * 3),      // Current Position
+            target: new Float32Array(CONFIG.count * 3),   // Target Position
+            velocity: new Float32Array(CONFIG.count * 3), // Physics Velocity
+            noiseOff: new Float32Array(CONFIG.count),     // Random offset
+            type: new Uint8Array(CONFIG.count),           // 0:Body, 1:Wick, 2:Flame
+            meshIndex: new Uint8Array(CONFIG.count),      // which geometry
+        };
+
+        // --- AI Variables ---
+        let faceLandmarker, handLandmarker, video;
+
+        // --- Initialization ---
         async function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
-            camera.position.set(0, 22, 85);
+            initScene();
+            initPostProcessing();
+            generateGeometriesAndParticles();
+            
+            try {
+                await initAI();
+                state.aiReady = true;
+                document.getElementById('ai-dot').classList.add('active');
+                updateGuide("✨ Pucker to Blow | Open Hand to Burst ✨");
+            } catch (e) {
+                console.warn("AI Fallback", e);
+                setupMouseFallback();
+                updateGuide("🖱️ Click to Interact");
+            }
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            // Reveal UI
+            document.getElementById('loader').style.opacity = 0;
+            setTimeout(() => document.getElementById('loader').remove(), 1000);
+            document.getElementById('main-title').classList.add('visible');
+            document.getElementById('status-bar').classList.add('visible');
+
+            animate();
+        }
+
+        // --- 1. Master Level Scene Setup (PBR & Lighting) ---
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050205, 0.015);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 0.1, 100);
+            camera.position.set(0, 4, 45);
+
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance", stencil: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; // 关键：电影级色调映射
-            renderer.toneMappingExposure = 1.3;
-            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            // 光影工程：增加方向光和环境光
-            const pmrem = new THREE.PMREMGenerator(renderer);
-            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+            // Lighting Logic - Cinematic Setup
+            const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+            scene.environment = envMap;
 
-            const sunLight = new THREE.DirectionalLight(0xffeedd, 1.5);
-            sunLight.position.set(20, 40, 20);
-            sunLight.castShadow = true;
-            scene.add(sunLight);
+            const spotLight = new THREE.SpotLight(0xffeebb, 100);
+            spotLight.position.set(10, 20, 10);
+            spotLight.angle = Math.PI / 6;
+            spotLight.penumbra = 1;
+            spotLight.castShadow = true;
+            spotLight.shadow.bias = -0.0001;
+            scene.add(spotLight);
 
-            const ambient = new THREE.AmbientLight(0xffeebb, 0.4);
-            scene.add(ambient);
-
-            // 后期渲染管线
-            const renderPass = new RenderPass(scene, camera);
-            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.7, 0.4, 0.9);
-            composer = new EffectComposer(renderer);
-            composer.addPass(renderPass);
-            composer.addPass(bloomPass);
+            const fillLight = new THREE.PointLight(0xB76E79, 20); // Rose fill
+            fillLight.position.set(-10, 5, -10);
+            scene.add(fillLight);
 
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
-
-            setupLuxuryCake();
-            await setupAI();
-
-            document.getElementById('loader').style.opacity = 0;
-            setTimeout(() => document.getElementById('loader').remove(), 1000);
-            animate();
         }
 
-        function setupLuxuryCake() {
-            const geos = [
-                new THREE.SphereGeometry(0.7, 32, 32),
-                new THREE.BoxGeometry(1, 1, 1),
-                new THREE.CylinderGeometry(0.25, 0.25, 3, 16),
-                new THREE.ConeGeometry(0.8, 1.8, 4) 
-            ];
+        function initPostProcessing() {
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
 
-            // 深度 PBR 材质
-            const matGold = new THREE.MeshPhysicalMaterial({ color: CONFIG.colors.gold, metalness: 1.0, roughness: 0.1, clearcoat: 1.0, envMapIntensity: 2.5 });
-            const matRose = new THREE.MeshPhysicalMaterial({ color: CONFIG.colors.rose, metalness: 0.2, roughness: 0.3, clearcoat: 0.6 });
-            const matIvory = new THREE.MeshPhysicalMaterial({ color: CONFIG.colors.ivory, roughness: 0.8 });
+            // High Quality Bloom
+            const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloom.threshold = 0.7; // 只让非常亮的地方发光
+            bloom.strength = 0.6;
+            bloom.radius = 0.5;
+            composer.addPass(bloom);
 
-            const countPerGeo = Math.ceil(CONFIG.total / geos.length);
-            geos.forEach((geo, i) => {
-                const im = new THREE.InstancedMesh(geo, new THREE.MeshPhysicalMaterial({ metalness: 0.5, roughness: 0.2, clearcoat: 0.8 }), countPerGeo);
-                im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                im.castShadow = true; im.receiveShadow = true;
-                mainGroup.add(im);
-                iMeshes.push(im);
+            // Custom Grain & Vignette Shader (Inline for simplicity)
+            const filmShader = {
+                uniforms: {
+                    tDiffuse: { value: null },
+                    time: { value: 0 },
+                    intensity: { value: 0.08 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+                `,
+                fragmentShader: `
+                    uniform sampler2D tDiffuse;
+                    uniform float time;
+                    uniform float intensity;
+                    varying vec2 vUv;
+                    
+                    float random(vec2 p) {
+                        return fract(sin(dot(p.xy, vec2(12.9898,78.233))) * 43758.5453);
+                    }
+                    
+                    void main() {
+                        vec4 color = texture2D(tDiffuse, vUv);
+                        // Vignette
+                        float dist = distance(vUv, vec2(0.5));
+                        color.rgb *= smoothstep(0.8, 0.2, dist * (1.0 + color.r * 0.2));
+                        // Grain
+                        float noise = random(vUv + time);
+                        color.rgb += (noise - 0.5) * intensity;
+                        gl_FragColor = color;
+                    }
+                `
+            };
+            const filmPass = new ShaderPass(filmShader);
+            filmPass.uniforms.intensity.value = 0.05;
+            composer.addPass(filmPass);
+        }
+
+        // --- 2. Advanced Geometry & Materials ---
+        function generateGeometriesAndParticles() {
+            // Geometries
+            const sphereGeo = new THREE.SphereGeometry(0.25, 16, 16);
+            const cubeGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+            const diamondGeo = new THREE.OctahedronGeometry(0.25);
+            // Heart
+            const heartShape = new THREE.Shape();
+            const x=0, y=0;
+            heartShape.moveTo(x+.25, y+.25);
+            heartShape.bezierCurveTo(x+.25, y+.25, x+.20, y, x, y);
+            heartShape.bezierCurveTo(x-.30, y, x-.30, y+.35, x-.30, y+.35);
+            heartShape.bezierCurveTo(x-.30, y+.55, x-.10, y+.77, x+.25, y+.95);
+            heartShape.bezierCurveTo(x+.60, y+.77, x+.80, y+.55, x+.80, y+.35);
+            heartShape.bezierCurveTo(x+.80, y+.35, x+.80, y, x+.50, y);
+            heartShape.bezierCurveTo(x+.35, y, x+.25, y+.25, x+.25, y+.25);
+            const heartGeo = new THREE.ExtrudeGeometry(heartShape, { depth: 0.15, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05 }).center().rotateX(Math.PI);
+
+            // Material: PBR Rose Gold
+            const matRoseGold = new THREE.MeshPhysicalMaterial({
+                color: CONFIG.colors.roseGold, metalness: 0.8, roughness: 0.2,
+                clearcoat: 1.0, clearcoatRoughness: 0.1
             });
+            const matGem = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff, metalness: 0.1, roughness: 0.1, transmission: 0.6, thickness: 1.0
+            });
+            const matFlame = new THREE.MeshBasicMaterial({ color: CONFIG.colors.ember });
 
-            for (let i = 0; i < CONFIG.total; i++) {
-                const gIdx = i % geos.length;
-                const iIdx = Math.floor(i / geos.length);
+            // Create InstancedMeshes
+            const geometries = [sphereGeo, cubeGeo, diamondGeo, heartGeo];
+            const materials = [matRoseGold, matRoseGold, matGem, matRoseGold];
+            
+            // We use a wrapper to manage multiple instanced meshes easily
+            const meshes = [];
+            geometries.forEach((geo, i) => {
+                const mesh = new THREE.InstancedMesh(geo, materials[i], CONFIG.count);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                meshes.push(mesh);
+                mainGroup.add(mesh);
+            });
+            // Flame mesh separate for glow
+            const flameMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.4, 8, 8), matFlame, 100);
+            mainGroup.add(flameMesh);
+
+            // Data Generation
+            const cakeRadius = 7;
+            const candles = 8;
+            let candleIdx = 0;
+
+            for(let i=0; i<CONFIG.count; i++) {
+                particles.noiseOff[i] = Math.random() * 100;
                 
-                // 解决分布问题：底层占 60%，上层占 40%
-                const isBottom = i < CONFIG.total * 0.6;
-                const isBow = i < 100;
+                // Select Geometry Type
+                const r = Math.random();
+                particles.meshIndex[i] = r > 0.8 ? 2 : (r > 0.6 ? 3 : (r > 0.3 ? 1 : 0));
+                
+                // --- Formation Logic ---
+                // Default: Cake Body
+                const angle = Math.random() * Math.PI * 2;
+                const rad = 5 + Math.random() * 5;
+                const h = (Math.random() - 0.5) * 6;
+                particles.target[i*3] = Math.cos(angle)*rad;
+                particles.target[i*3+1] = h;
+                particles.target[i*3+2] = Math.sin(angle)*rad;
+                particles.type[i] = 0; // Body
 
-                let color = isBottom ? CONFIG.colors.ivory : CONFIG.colors.rose;
-                if (Math.random() > 0.85 || isBow) color = CONFIG.colors.gold;
+                // Candles (Top layers)
+                if (i > CONFIG.count - 200) {
+                    const cI = i % candles;
+                    const cAngle = (cI / candles) * Math.PI * 2;
+                    const cx = Math.cos(cAngle) * 4;
+                    const cz = Math.sin(cAngle) * 4;
+                    
+                    particles.target[i*3] = cx + (Math.random()-0.5)*0.3;
+                    particles.target[i*3+1] = 4 + Math.random() * 2; // Wick height
+                    particles.target[i*3+2] = cz + (Math.random()-0.5)*0.3;
+                    particles.type[i] = 1; // Wick
 
-                const pos = new THREE.Vector3();
-                if (isBow) {
-                    // 蝴蝶结数学分布
-                    const side = i < 50 ? 1 : -1;
-                    const t = ((i % 50) / 50) * Math.PI * 2;
-                    const r = Math.exp(Math.sin(t)) - 2 * Math.cos(4 * t) + Math.pow(Math.sin((2 * t - Math.PI) / 24), 5);
-                    pos.set(side * r * 2.8 + (side * 8), -3 + Math.cos(t) * 4, 18);
-                } else {
-                    const radius = isBottom ? 16 + Math.random() * 5 : 12 + Math.random() * 4;
-                    const angle = Math.random() * Math.PI * 2;
-                    const y = isBottom ? -6 + Math.random() * 10 : 7 + Math.random() * 8;
-                    pos.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+                    // The very tips are flames
+                    if (i > CONFIG.count - candles - 1) {
+                         particles.target[i*3] = cx;
+                         particles.target[i*3+1] = 6.5;
+                         particles.target[i*3+2] = cz;
+                         particles.type[i] = 2; // Flame
+                         particles.meshIndex[i] = 99; // Special flag
+                    }
                 }
 
-                particleData.push({
-                    gIdx, iIdx,
-                    origin: pos.clone(),
-                    rot: new THREE.Euler(Math.random()*6, Math.random()*6, Math.random()*6),
-                    vRot: new THREE.Vector3(Math.random()*0.02, Math.random()*0.02, Math.random()*0.02)
-                });
-                iMeshes[gIdx].setColorAt(iIdx, color);
+                // Initial Pos
+                particles.pos[i*3] = (Math.random()-0.5) * 50;
+                particles.pos[i*3+1] = (Math.random()-0.5) * 50;
+                particles.pos[i*3+2] = (Math.random()-0.5) * 50;
             }
-
-            // 蜡烛与物理光源
-            candle = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 12, 16), matIvory);
-            candle.position.set(0, 22, 0);
-            candle.castShadow = true;
-            mainGroup.add(candle);
-
-            flickerLight = new THREE.PointLight(0xffaa00, 100, 60);
-            flickerLight.position.set(0, 7, 0);
-            flickerLight.castShadow = true;
-            candle.add(flickerLight);
-
-            const pts = [];
-            for (let i = 0; i < 11; i++) pts.push(new THREE.Vector2(Math.sin(i * 0.3) * 0.7 * (1 - i / 10), i * 0.5));
-            flame = new THREE.Mesh(new THREE.LatheGeometry(pts, 20), new THREE.MeshStandardMaterial({ color: 0xff8800, emissive: 0xff4400, emissiveIntensity: 10 }));
-            flame.position.set(0, 6.5, 0);
-            candle.add(flame);
+            
+            // Expose meshes to scope
+            state.meshes = meshes;
+            state.flameMesh = flameMesh;
         }
 
-        async function setupAI() {
+        // --- 3. Text Generation with Centering ---
+        function generateTextTargets() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1000; canvas.height = 300;
+            const ctx = canvas.getContext('2d');
+            ctx.font = 'bold 120px "Playfair Display"';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('HAPPY BIRTHDAY', 500, 150);
+
+            const idata = ctx.getImageData(0,0,1000,300).data;
+            const validPixels = [];
+            for(let y=0; y<300; y+=4) {
+                for(let x=0; x<1000; x+=4) {
+                    if(idata[(y*1000+x)*4] > 128) {
+                        validPixels.push({
+                            x: (x - 500) * 0.15,
+                            y: -(y - 150) * 0.15 + 2 // Lift up slightly
+                        });
+                    }
+                }
+            }
+
+            // Assign text targets
+            for(let i=0; i<CONFIG.count; i++) {
+                if(validPixels.length === 0) break;
+                const p = validPixels[i % validPixels.length];
+                // Reuse target buffer for text state
+                if (state.phase === 'TEXT' || state.phase === 'EXPLODE') {
+                    // Store text pos temporarily or just lerp towards it
+                    // Here we will dynamically interpolate in animate()
+                }
+                // Pre-calc text targets into a secondary array would be better, 
+                // but to save memory, let's just use a functional generator in animate
+            }
+            return validPixels;
+        }
+        const textPixels = generateTextTargets();
+
+        // --- 4. Logic & Interaction ---
+        function triggerBlow() {
+            if (state.phase !== 'CAKE') return;
+            state.phase = 'SMOKE';
+            updateGuide("Wait for it...");
+            
+            // Smoke animation delay
+            setTimeout(() => {
+                state.phase = 'TEXT';
+                updateTitle("Happy Birthday", true);
+                updateGuide(state.aiReady ? "👐 Open Hands to Celebrate!" : "🖱️ Move Mouse to Enjoy");
+                // Color Shift
+                state.meshes.forEach(m => {
+                    if(m.material.color) m.material.color.lerp(CONFIG.colors.champagne, 0.5);
+                });
+            }, 1500);
+        }
+
+        function triggerExplode() {
+            if (state.phase !== 'TEXT') return;
+            state.phase = 'EXPLODE';
+            updateGuide("✨ Magic ✨");
+        }
+
+        function updateGuide(text) {
+            const el = document.getElementById('guide-text');
+            el.style.opacity = 0;
+            setTimeout(() => { el.innerText = text; el.style.opacity = 1; }, 300);
+        }
+        
+        function updateTitle(text, show) {
+            const t = document.getElementById('main-title');
+            t.style.opacity = 0;
+            setTimeout(() => {
+                t.innerText = text;
+                if(show) t.classList.add('visible');
+            }, 500);
+        }
+
+        function setupMouseFallback() {
+            window.addEventListener('click', () => {
+                if(state.phase === 'CAKE') triggerBlow();
+                else if(state.phase === 'TEXT') triggerExplode();
+                else if(state.phase === 'EXPLODE') {
+                     state.phase = 'CAKE';
+                     state.time = 0; // Reset subtle motion
+                     updateTitle("Princess Celebration", true);
+                     updateGuide("🖱️ Click to Blow Candle");
+                }
+            });
+            window.addEventListener('mousemove', (e) => {
+                if(state.phase !== 'TEXT') {
+                    state.rotationTarget = (e.clientX / window.innerWidth - 0.5) * 2;
+                }
+            });
+        }
+
+        // --- 5. The Render Loop (Masterpiece Optimization) ---
+        function animate() {
+            requestAnimationFrame(animate);
+            state.time += 0.01;
+            
+            // AI Updates
+            if (state.aiReady && video.readyState >= 2) {
+                processAI();
+            }
+
+            // Smooth Rotation
+            if (state.phase === 'TEXT') state.rotationTarget = 0; // Lock rotation for text
+            state.rotationCurrent += (state.rotationTarget - state.rotationCurrent) * 0.05;
+            mainGroup.rotation.y = state.rotationCurrent;
+
+            // Update Particles
+            updateParticles();
+
+            // Post Processing
+            composer.render();
+        }
+
+        function processAI() {
+            const t = performance.now();
+            const resultsFace = faceLandmarker.detectForVideo(video, t);
+            const resultsHand = handLandmarker.detectForVideo(video, t);
+            
+            // 1. Face (Blow)
+            if (resultsFace.faceBlendshapes.length > 0) {
+                const pucker = resultsFace.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
+                state.puckerScore = state.puckerScore * 0.8 + pucker * 0.2; // Smooth
+                if (state.puckerScore > CONFIG.physics.blowTrigger && state.phase === 'CAKE') {
+                    triggerBlow();
+                }
+            }
+            
+            // 2. Hand (Rotate & Explode)
+            if (resultsHand.landmarks.length > 0) {
+                const lm = resultsHand.landmarks[0];
+                const palmX = lm[9].x; 
+                // Rotation
+                if(state.phase !== 'TEXT') state.rotationTarget = (1.0 - palmX - 0.5) * 3;
+
+                // Spread (Explode)
+                const spread = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+                if (spread > 0.45 && state.phase === 'TEXT') triggerExplode();
+            }
+        }
+
+        function updateParticles() {
+            const counts = [0,0,0,0]; // Index counts
+            let flameCount = 0;
+
+            for(let i=0; i<CONFIG.count; i++) {
+                const i3 = i * 3;
+                const type = particles.type[i];
+                const noise = particles.noiseOff[i];
+                
+                // --- Physics Targets Calculation ---
+                let tx, ty, tz;
+
+                if (state.phase === 'CAKE') {
+                    tx = particles.target[i3];
+                    ty = particles.target[i3+1];
+                    tz = particles.target[i3+2];
+                    
+                    // Flame Flicker
+                    if(type === 2) {
+                        const flicker = Math.sin(state.time * 20 + noise) * 0.1 + (state.puckerScore * 2); // React to blow
+                        ty += flicker;
+                        tx += (Math.random()-0.5) * state.puckerScore; // Shake
+                    }
+                } 
+                else if (state.phase === 'SMOKE') {
+                    if (type === 2 || type === 1) {
+                         tx = particles.pos[i3] + Math.sin(state.time * 5 + noise)*0.05;
+                         ty = particles.pos[i3+1] + 0.15; // Rise
+                         tz = particles.pos[i3+2];
+                    } else {
+                        tx = particles.target[i3]; ty = particles.target[i3+1]; tz = particles.target[i3+2];
+                    }
+                }
+                else if (state.phase === 'TEXT') {
+                    // Map to text pixels
+                    const p = textPixels[i % textPixels.length];
+                    tx = p.x; ty = p.y; tz = 0;
+                    // Add subtle float
+                    tx += Math.sin(state.time + noise)*0.1;
+                    ty += Math.cos(state.time * 1.5 + noise)*0.1;
+                }
+                else if (state.phase === 'EXPLODE') {
+                    // Expansion
+                    const theta = noise;
+                    const phi = noise * 2;
+                    const r = 30 + Math.sin(state.time * 2 + noise) * 5;
+                    tx = r * Math.sin(phi) * Math.cos(theta);
+                    ty = r * Math.sin(phi) * Math.sin(theta);
+                    tz = r * Math.cos(phi);
+                }
+
+                // --- Integration (Damping) ---
+                const v3 = i3;
+                // v = (target - current) * damp
+                particles.velocity[v3]   += (tx - particles.pos[v3]) * CONFIG.physics.damp * 0.5;
+                particles.velocity[v3+1] += (ty - particles.pos[v3+1]) * CONFIG.physics.damp * 0.5;
+                particles.velocity[v3+2] += (tz - particles.pos[v3+2]) * CONFIG.physics.damp * 0.5;
+                
+                // Apply friction
+                particles.velocity[v3]   *= 0.85;
+                particles.velocity[v3+1] *= 0.85;
+                particles.velocity[v3+2] *= 0.85;
+
+                // Update Pos
+                particles.pos[v3]   += particles.velocity[v3];
+                particles.pos[v3+1] += particles.velocity[v3+1];
+                particles.pos[v3+2] += particles.velocity[v3+2];
+
+                // --- Matrix Update ---
+                dummy.position.set(particles.pos[v3], particles.pos[v3+1], particles.pos[v3+2]);
+                
+                // Rotation & Scale
+                if (type === 2) { // Flame
+                     // Special Flame Scaling based on pucker
+                     const s = (state.phase === 'CAKE') ? (1.5 - state.puckerScore) + Math.sin(state.time*30)*0.2 : 0;
+                     dummy.scale.set(s, s*1.5, s);
+                     dummy.rotation.set(0,0,0);
+                } else {
+                    dummy.rotation.set(state.time + noise, state.time + noise, 0);
+                    let s = (state.phase === 'EXPLODE') ? 0.8 : 1.0;
+                    if(state.phase === 'TEXT') s = 0.6;
+                    dummy.scale.set(s, s, s);
+                }
+                dummy.updateMatrix();
+
+                // Assign to correct InstancedMesh
+                if (type === 2 && particles.meshIndex[i] === 99) {
+                    state.flameMesh.setMatrixAt(flameCount++, dummy.matrix);
+                } else {
+                    const mIdx = particles.meshIndex[i];
+                    state.meshes[mIdx].setMatrixAt(counts[mIdx]++, dummy.matrix);
+                }
+            }
+
+            state.flameMesh.count = flameCount;
+            state.flameMesh.instanceMatrix.needsUpdate = true;
+            state.meshes.forEach((m, idx) => {
+                m.count = counts[idx];
+                m.instanceMatrix.needsUpdate = true;
+            });
+        }
+
+        async function initAI() {
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
-                runningMode: "VIDEO", numHands: 2
+                runningMode: "VIDEO", numHands: 1
             });
             faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
                 runningMode: "VIDEO", outputFaceBlendshapes: true
             });
             video = document.getElementById('webcam');
-            const s = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-            video.srcObject = s;
-            video.play();
-            return new Promise(res => video.onloadeddata = res);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            return new Promise(resolve => video.onloadeddata = resolve);
         }
-
-        function animate() {
-            const time = performance.now() * 0.001;
-            requestAnimationFrame(animate);
-
-            if (video.readyState >= 2) {
-                const h = handLandmarker.detectForVideo(video, performance.now());
-                const f = faceLandmarker.detectForVideo(video, performance.now());
-                if (h.landmarks.length > 0) {
-                    state.rotY = THREE.MathUtils.lerp(state.rotY, (h.landmarks[0][9].x - 0.5) * 5, 0.1);
-                    if (h.landmarks.length === 2) {
-                        const d = Math.hypot(h.landmarks[0][9].x - h.landmarks[1][9].x, h.landmarks[0][9].y - h.landmarks[1][9].y);
-                        state.explode = THREE.MathUtils.lerp(state.explode, d > 0.6 ? 1 : 0, 0.1);
-                    }
-                }
-                if (f.faceBlendshapes.length > 0) {
-                    const p = f.faceBlendshapes[0].categories.find(c => c.categoryName === 'mouthPucker').score;
-                    if (p > 0.5) state.blown = true;
-                }
-            }
-
-            mainGroup.rotation.y = state.rotY;
-
-            if (flame) {
-                flame.quaternion.copy(mainGroup.quaternion).invert();
-                const flicker = 1 + Math.sin(time * 25) * 0.15;
-                flame.scale.set(flicker, 1.2 + Math.sin(time * 15) * 0.2, flicker);
-                flickerLight.intensity = (state.blown ? 0 : 80) * flicker;
-                flame.visible = !state.blown;
-            }
-
-            particleData.forEach((p, i) => {
-                const { gIdx, iIdx, origin, rot, vRot } = p;
-                const spiral = state.explode * Math.sin(time + origin.y * 0.1) * 8;
-                dummy.position.x = origin.x * (1 + state.explode * 1.8) + Math.cos(time + i) * spiral;
-                dummy.position.y = origin.y + (state.explode * 30) + Math.sin(time * 2 + i) * 0.5;
-                dummy.position.z = origin.z * (1 + state.explode * 1.8) + Math.sin(time + i) * spiral;
-                rot.x += vRot.x; rot.y += vRot.y;
-                dummy.rotation.copy(rot);
-                dummy.scale.setScalar(1.4 * (1 - state.explode * 0.2));
-                dummy.updateMatrix();
-                iMeshes[gIdx].setMatrixAt(iIdx, dummy.matrix);
-            });
-
-            iMeshes.forEach(im => im.instanceMatrix.needsUpdate = true);
-            bloomPass.strength = state.blown ? 0.3 : (0.8 + Math.sin(time * 2) * 0.1 + state.explode * 2.2);
-            composer.render();
-        }
+        
+        // Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init();
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
