@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Golden Birthday Wish - Gesture Interactive</title>
+    <link rel="icon" href="data:,">
+    
     <style>
         @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@1&display=swap');
 
@@ -81,6 +83,7 @@
             padding: 40px;
             border: 1px solid #eebb99;
             text-align: center;
+            border-radius: 8px;
         }
         
         .status-text {
@@ -90,7 +93,6 @@
             font-family: sans-serif;
         }
 
-        /* 隐藏的文件输入 */
         #file-input { display: none; }
     </style>
     
@@ -99,7 +101,8 @@
         "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/+esm"
+            "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/+esm",
+            "@tweenjs/tween.js": "https://unpkg.com/@tweenjs/tween.js@23.1.1/dist/tween.esm.js"
         }
     }
     </script>
@@ -124,8 +127,6 @@
 
     <input type="file" id="file-input" multiple accept="image/*">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
-
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -133,6 +134,8 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { FilesetResolver, HandLandmarker, FaceLandmarker, DrawingUtils } from '@mediapipe/tasks-vision';
+        // 关键修复：从 importmap 引入 Tween
+        import * as TWEEN from '@tweenjs/tween.js';
 
         // --- Configuration ---
         const PARTICLE_COUNT = 6000;
@@ -149,38 +152,28 @@
         };
         let currentState = APP_STATE.ASSEMBLED;
         let isCandleLit = true;
-        let photos = []; // Stores textures
+        let photos = [];
         let photoMeshes = [];
 
-        // --- Three.js Globals ---
+        // --- Globals ---
         let scene, camera, renderer, composer, controls;
-        let particleMesh, dummy, positionAttribute;
-        let particles = []; // Stores data: { currentPos, targetCake, targetScatter, targetText, velocity }
+        let particleMesh, dummy;
+        let particles = []; 
         let textPoints = [];
         
-        // --- AI Globals ---
+        // AI Globals
         let handLandmarker, faceLandmarker;
         let video;
         let lastVideoTime = -1;
 
         // --- Initialization ---
         async function init() {
-            // 1. Setup Three.js
             setupThreeJS();
-            
-            // 2. Setup Particles
             generateParticles();
-            
-            // 3. Setup AI
             await setupMediaPipe();
-            
-            // 4. Setup Video
             setupVideo();
-            
-            // 5. Setup Events
             setupEvents();
 
-            // Start Loop
             document.getElementById('loading').style.display = 'none';
             animate();
         }
@@ -200,11 +193,10 @@
             renderer.toneMapping = THREE.ReinhardToneMapping;
             container.appendChild(renderer.domElement);
 
-            // Post Processing (Bloom for Cinematic Glow)
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
             bloomPass.threshold = 0.2;
-            bloomPass.strength = 1.2; // High glow
+            bloomPass.strength = 1.2; 
             bloomPass.radius = 0.5;
 
             composer = new EffectComposer(renderer);
@@ -215,21 +207,17 @@
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             
-            // Lights
             const ambientLight = new THREE.AmbientLight(0x404040);
             scene.add(ambientLight);
             
-            // Candle Light (Point Light)
             const candleLight = new THREE.PointLight(0xffaa33, 2, 20);
             candleLight.position.set(0, 6, 0);
             candleLight.name = "CandleLight";
             scene.add(candleLight);
         }
 
-        // --- Geometry & Particle Logic ---
-        
         function generateParticles() {
-            // Generate "Happy Birthday" Text Points
+            // Text Generation
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 200;
@@ -244,72 +232,59 @@
             textPoints = [];
             for(let y=0; y<50; y+=2) {
                 for(let x=0; x<200; x+=2) {
-                    const alpha = imageData.data[(y * 200 + x) * 4 + 3];
-                    if(alpha > 128) {
+                    if(imageData.data[(y * 200 + x) * 4 + 3] > 128) {
                         textPoints.push(new THREE.Vector3((x - 100)*0.15, (25 - y)*0.15 + 5, 0));
                     }
                 }
             }
 
-            // Instanced Mesh Setup
             const geometry = new THREE.SphereGeometry(0.1, 8, 8);
             const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
             particleMesh = new THREE.InstancedMesh(geometry, material, PARTICLE_COUNT);
-            particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             
             dummy = new THREE.Object3D();
-            const colors = [];
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // 1. Cake Formation (Cylinders)
-                let r, theta, y;
-                let color;
+                let targetCake, targetScatter, targetText, color;
                 
+                // Cake Logic
                 if (i < PARTICLE_COUNT * 0.6) {
-                    // Bottom Tier
-                    r = Math.random() * 4 + 1;
-                    theta = Math.random() * Math.PI * 2;
-                    y = (Math.random() - 0.5) * 3; // Height
+                    const r = Math.random() * 4 + 1;
+                    const theta = Math.random() * Math.PI * 2;
+                    const y = (Math.random() - 0.5) * 3;
+                    targetCake = new THREE.Vector3(r * Math.cos(theta), y, r * Math.sin(theta));
                     color = CAKE_COLOR_1.clone().lerp(CAKE_COLOR_3, Math.random());
                 } else if (i < PARTICLE_COUNT * 0.9) {
-                    // Top Tier
-                    r = Math.random() * 2.5;
-                    theta = Math.random() * Math.PI * 2;
-                    y = Math.random() * 2 + 1.5;
+                    const r = Math.random() * 2.5;
+                    const theta = Math.random() * Math.PI * 2;
+                    const y = Math.random() * 2 + 1.5;
+                    targetCake = new THREE.Vector3(r * Math.cos(theta), y, r * Math.sin(theta));
                     color = CAKE_COLOR_2.clone().lerp(CAKE_COLOR_3, Math.random());
                 } else {
-                    // Flame / Candle
-                    r = Math.random() * 0.2;
-                    theta = Math.random() * Math.PI * 2;
-                    y = Math.random() * 1 + 4;
-                    color = new THREE.Color(0xff5500); // Fire
+                    const r = Math.random() * 0.2;
+                    const theta = Math.random() * Math.PI * 2;
+                    const y = Math.random() * 1 + 4;
+                    targetCake = new THREE.Vector3(r * Math.cos(theta), y, r * Math.sin(theta));
+                    color = new THREE.Color(0xff5500);
                 }
 
-                const targetCake = new THREE.Vector3(r * Math.cos(theta), y, r * Math.sin(theta));
-                
-                // 2. Scatter Formation
-                const targetScatter = new THREE.Vector3(
+                // Scatter Logic
+                targetScatter = new THREE.Vector3(
                     (Math.random() - 0.5) * 30,
                     (Math.random() - 0.5) * 30,
                     (Math.random() - 0.5) * 30
                 );
 
-                // 3. Text Formation (Map particles to text points, recycle or hide excess)
-                let targetText;
+                // Text Logic
                 if (i < textPoints.length * 5) {
-                    // Multiple particles per text point for volume
                     const pIndex = i % textPoints.length;
                     targetText = textPoints[pIndex].clone().add(new THREE.Vector3(
-                        (Math.random()-0.5)*0.2, 
-                        (Math.random()-0.5)*0.2, 
-                        (Math.random()-0.5)*0.2
+                        (Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2
                     ));
                 } else {
-                    // Excess particles float away in text mode
-                    targetText = targetScatter.clone(); 
+                    targetText = targetScatter.clone();
                 }
 
-                // Initial Position (Scattered)
                 dummy.position.copy(targetCake);
                 dummy.updateMatrix();
                 particleMesh.setMatrixAt(i, dummy.matrix);
@@ -320,65 +295,43 @@
                     cake: targetCake,
                     scatter: targetScatter,
                     text: targetText,
-                    color: color
                 });
             }
             
-            particleMesh.instanceMatrix.needsUpdate = true;
-            particleMesh.instanceColor.needsUpdate = true;
             scene.add(particleMesh);
-            
-            // Placeholder for Photos
             createPhotoPlaceholders();
         }
 
         function createPhotoPlaceholders() {
-            const geom = new THREE.PlaneGeometry(6, 4); // 3:2 Aspect Ratio
+            const geom = new THREE.PlaneGeometry(6, 4);
             for(let i=0; i<5; i++) {
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: 0x222222, 
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 0
+                    color: 0x222222, side: THREE.DoubleSide, transparent: true, opacity: 0
                 });
                 const mesh = new THREE.Mesh(geom, mat);
-                
-                // Random positions for scattered state
                 mesh.userData = {
-                    originalPos: new THREE.Vector3(
-                        (Math.random()-0.5) * 20,
-                        (Math.random()-0.5) * 10,
-                        (Math.random()-0.5) * 10
-                    ),
-                    originalRot: new THREE.Euler(
-                        (Math.random()-0.5), (Math.random()-0.5), 0
-                    )
+                    originalPos: new THREE.Vector3((Math.random()-0.5)*20, (Math.random()-0.5)*10, (Math.random()-0.5)*10),
+                    originalRot: new THREE.Euler((Math.random()-0.5), (Math.random()-0.5), 0)
                 };
-                
                 mesh.position.copy(mesh.userData.originalPos);
                 mesh.rotation.copy(mesh.userData.originalRot);
-                
                 scene.add(mesh);
                 photoMeshes.push(mesh);
             }
         }
 
-        // --- State Transitions ---
-
+        // --- Logic ---
         function transformTo(state) {
             if (currentState === state) return;
             currentState = state;
-            
-            console.log("Transisioning to:", state);
             document.getElementById('gesture-hint').innerText = "Mode: " + state.toUpperCase();
 
-            // 1. Particle Transition
             particles.forEach((p, i) => {
                 let target;
                 if (state === APP_STATE.ASSEMBLED) target = p.cake;
                 else if (state === APP_STATE.SCATTERED) target = p.scatter;
                 else if (state === APP_STATE.CUSTOM_TEXT) target = p.text;
-                else if (state === APP_STATE.PHOTO_FOCUS) target = p.scatter; // Bg scatters
+                else if (state === APP_STATE.PHOTO_FOCUS) target = p.scatter;
 
                 new TWEEN.Tween(p.current)
                     .to({ x: target.x, y: target.y, z: target.z }, 1500 + Math.random() * 500)
@@ -391,27 +344,18 @@
                     .start();
             });
 
-            // 2. Photo Transition
-            if (state === APP_STATE.SCATTERED || state === APP_STATE.PHOTO_FOCUS) {
-                photoMeshes.forEach(mesh => {
-                    new TWEEN.Tween(mesh.material)
-                        .to({ opacity: (photos.length > 0 ? 0.8 : 0.1) }, 1000)
-                        .start();
-                });
-            } else {
-                // Hide photos in Cake or Text mode
-                photoMeshes.forEach(mesh => {
-                    new TWEEN.Tween(mesh.material).to({ opacity: 0 }, 500).start();
-                });
-            }
+            // Photo Opacity
+            const targetOpacity = (state === APP_STATE.SCATTERED || state === APP_STATE.PHOTO_FOCUS) ? 0.8 : 0;
+            photoMeshes.forEach(mesh => {
+                new TWEEN.Tween(mesh.material).to({ opacity: photos.length > 0 ? targetOpacity : 0 }, 1000).start();
+            });
 
-            // 3. Lighting Logic
+            // Light Logic
             const light = scene.getObjectByName("CandleLight");
             if (state === APP_STATE.ASSEMBLED) {
                  new TWEEN.Tween(light).to({ intensity: 2 }, 1000).start();
                  isCandleLit = true;
             } else {
-                // Dim light for other states
                 new TWEEN.Tween(light).to({ intensity: 0.2 }, 500).start();
             }
         }
@@ -419,71 +363,43 @@
         function focusPhoto(index) {
             if (currentState === APP_STATE.PHOTO_FOCUS) return;
             currentState = APP_STATE.PHOTO_FOCUS;
-            document.getElementById('gesture-hint').innerText = "Mode: PHOTO MEMORY";
-
+            
             // Scatter background
             particles.forEach((p, i) => {
                 new TWEEN.Tween(p.current)
                     .to({ x: p.scatter.x, y: p.scatter.y, z: p.scatter.z }, 1000)
-                    .easing(TWEEN.Easing.Quadratic.Out)
                     .onUpdate(() => {
                         dummy.position.copy(p.current);
                         dummy.updateMatrix();
                         particleMesh.setMatrixAt(i, dummy.matrix);
-                    })
-                    .start();
+                    }).start();
             });
 
-            // Move selected photo to front
             photoMeshes.forEach((mesh, i) => {
                 if (i === index) {
-                    new TWEEN.Tween(mesh.position)
-                        .to({ x: 0, y: 0, z: 20 }, 1000)
-                        .easing(TWEEN.Easing.Back.Out)
-                        .start();
-                    new TWEEN.Tween(mesh.rotation)
-                        .to({ x: 0, y: 0, z: 0 }, 1000)
-                        .start();
-                    new TWEEN.Tween(mesh.scale)
-                        .to({ x: 1.5, y: 1.5, z: 1.5 }, 1000)
-                        .start();
+                    new TWEEN.Tween(mesh.position).to({ x: 0, y: 0, z: 20 }, 1000).easing(TWEEN.Easing.Back.Out).start();
+                    new TWEEN.Tween(mesh.rotation).to({ x: 0, y: 0, z: 0 }, 1000).start();
+                    new TWEEN.Tween(mesh.scale).to({ x: 1.5, y: 1.5, z: 1.5 }, 1000).start();
                     mesh.material.opacity = 1;
                 } else {
-                    // Push others back
-                    new TWEEN.Tween(mesh.position)
-                        .to({ x: mesh.userData.originalPos.x, y: mesh.userData.originalPos.y, z: mesh.userData.originalPos.z - 10 }, 1000)
-                        .start();
+                    new TWEEN.Tween(mesh.position).to({ x: mesh.userData.originalPos.x, y: mesh.userData.originalPos.y, z: mesh.userData.originalPos.z - 10 }, 1000).start();
                     mesh.material.opacity = 0.2;
                 }
             });
         }
 
-        // --- AI & Gesture Logic ---
-
+        // --- AI Logic ---
         async function setupMediaPipe() {
-            const vision = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
-            );
-
-            // 1. Hand Landmarker
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm");
+            
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO",
-                numHands: 1
+                baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`, delegate: "GPU" },
+                runningMode: "VIDEO", numHands: 1
             });
 
-            // 2. Face Landmarker (for Mouth)
             faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                    delegate: "GPU"
-                },
-                outputFaceBlendshapes: true,
-                runningMode: "VIDEO",
-                numFaces: 1
+                baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`, delegate: "GPU" },
+                outputFaceBlendshapes: true, runningMode: "VIDEO", numFaces: 1
             });
         }
 
@@ -499,59 +415,31 @@
             if (lastVideoTime !== video.currentTime) {
                 lastVideoTime = video.currentTime;
                 let startTimeMs = performance.now();
-                
-                // Detect Hands
-                if (handLandmarker) {
-                    const handResult = handLandmarker.detectForVideo(video, startTimeMs);
-                    processHandGestures(handResult);
-                }
-                
-                // Detect Face
-                if (faceLandmarker) {
-                    const faceResult = faceLandmarker.detectForVideo(video, startTimeMs);
-                    processFaceExpressions(faceResult);
-                }
+                if (handLandmarker) processHandGestures(handLandmarker.detectForVideo(video, startTimeMs));
+                if (faceLandmarker) processFaceExpressions(faceLandmarker.detectForVideo(video, startTimeMs));
             }
             window.requestAnimationFrame(predictWebcam);
         }
 
         function processHandGestures(result) {
             if (!result.landmarks || result.landmarks.length === 0) return;
-
             const landmarks = result.landmarks[0];
-            
-            // 1. Is Fist? (Fingertips close to Wrist/Palm)
             const wrist = landmarks[0];
             const fingerTips = [8, 12, 16, 20].map(i => landmarks[i]);
-            const avgDist = fingerTips.reduce((sum, tip) => {
-                return sum + Math.sqrt(Math.pow(tip.x - wrist.x, 2) + Math.pow(tip.y - wrist.y, 2));
-            }, 0) / 4;
-
-            // 2. Is Open Hand?
-            const isOpen = avgDist > 0.35; // Threshold adjusted for normalized coords
+            const avgDist = fingerTips.reduce((sum, tip) => sum + Math.sqrt(Math.pow(tip.x - wrist.x, 2) + Math.pow(tip.y - wrist.y, 2)), 0) / 4;
+            
+            const isOpen = avgDist > 0.35;
             const isFist = avgDist < 0.15;
-
-            // 3. Is Pinching? (Thumb tip 4 close to Index tip 8)
-            const pinchDist = Math.sqrt(
-                Math.pow(landmarks[4].x - landmarks[8].x, 2) + 
-                Math.pow(landmarks[4].y - landmarks[8].y, 2)
-            );
+            const pinchDist = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
             const isPinch = pinchDist < 0.05;
 
-            // Logic Tree
             if (isPinch && currentState !== APP_STATE.PHOTO_FOCUS) {
-                // Select a random photo to focus for demo purposes
-                // Real implementation would map hand position to screen coords
                 focusPhoto(0); 
             } else if (isFist) {
                 transformTo(APP_STATE.ASSEMBLED);
             } else if (isOpen) {
-                // If open hand + rotating (simple check: hand x position movement)
                 if (currentState === APP_STATE.SCATTERED) {
-                    // Map hand X to camera rotation
-                    const handX = landmarks[9].x; // Middle finger knuckle
-                    const targetRot = (handX - 0.5) * 2; // -1 to 1
-                    scene.rotation.y = targetRot; 
+                    scene.rotation.y = (landmarks[9].x - 0.5) * 2; 
                 } else {
                     transformTo(APP_STATE.SCATTERED);
                 }
@@ -560,30 +448,13 @@
 
         function processFaceExpressions(result) {
             if (!result.faceBlendshapes || result.faceBlendshapes.length === 0) return;
-
-            // MediaPipe Face Blendshapes: look for 'mouthPucker'
-            const blendshapes = result.faceBlendshapes[0].categories;
-            const pucker = blendshapes.find(s => s.categoryName === 'mouthPucker');
-
-            // Threshold for "Blowing/Pouting"
-            if (pucker && pucker.score > 0.6) {
-                if (currentState === APP_STATE.ASSEMBLED && isCandleLit) {
-                    // Blow out candle action
-                    isCandleLit = false;
-                    
-                    // Animation: Dim light -> Explode to Text
-                    const light = scene.getObjectByName("CandleLight");
-                    new TWEEN.Tween(light)
-                        .to({ intensity: 0 }, 300)
-                        .onComplete(() => {
-                            transformTo(APP_STATE.CUSTOM_TEXT);
-                        })
-                        .start();
-                }
+            const pucker = result.faceBlendshapes[0].categories.find(s => s.categoryName === 'mouthPucker');
+            if (pucker && pucker.score > 0.6 && currentState === APP_STATE.ASSEMBLED && isCandleLit) {
+                isCandleLit = false;
+                new TWEEN.Tween(scene.getObjectByName("CandleLight")).to({ intensity: 0 }, 300).onComplete(() => transformTo(APP_STATE.CUSTOM_TEXT)).start();
             }
         }
 
-        // --- Event Listeners ---
         function setupEvents() {
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -591,7 +462,6 @@
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 composer.setSize(window.innerWidth, window.innerHeight);
             });
-
             document.getElementById('file-input').addEventListener('change', (e) => {
                 const files = e.target.files;
                 if (files.length > 0) {
@@ -613,31 +483,17 @@
             });
         }
 
-        // --- Animation Loop ---
         function animate() {
             requestAnimationFrame(animate);
             TWEEN.update();
             particleMesh.instanceMatrix.needsUpdate = true;
-            
-            // Subtle rotation for cake if assembled
-            if (currentState === APP_STATE.ASSEMBLED) {
-                scene.rotation.y += 0.002;
-            }
-
-            // Flame flickering logic
+            if (currentState === APP_STATE.ASSEMBLED) scene.rotation.y += 0.002;
             if (isCandleLit) {
-                const time = Date.now() * 0.005;
-                const light = scene.getObjectByName("CandleLight");
-                light.intensity = 1.5 + Math.sin(time * 10) * 0.3; // Flicker
-                
-                // Animate Flame particles (Last 10% of particles)
-                // This is a simplified visual trick
+                scene.getObjectByName("CandleLight").intensity = 1.5 + Math.sin(Date.now() * 0.005 * 10) * 0.3;
             }
-
             composer.render();
         }
 
-        // Start
         init();
     </script>
 </body>
