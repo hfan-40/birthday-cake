@@ -3,30 +3,31 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>玫瑰金与象牙白 - 3D 生日庆典</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Rose Gold & Ivory 3D</title>
     <style>
-        /* 注入字体与核心样式，不再依赖外部 index.css */
-        @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Cinzel:wght@700&family=Playfair+Display:ital@1&display=swap');
-        
-        body, html, #root { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden; 
-            background: #050505; 
+        /* 注入字体 */
+        @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap');
+
+        :root {
+            --rose-pink: #F19EB5;
+            --metallic-gold: #D4AF37;
+            --ivory: #FFFFF0;
+            --bg-dark: #050505;
         }
 
-        .canvas-container {
-            position: absolute;
-            top: 0;
-            left: 0;
+        body, html, #root {
+            margin: 0;
+            padding: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            color: var(--ivory);
+            font-family: 'Playfair Display', serif;
         }
 
-        .ui-overlay {
+        /* 原生 CSS 替代 Tailwind */
+        .ui-container {
             position: absolute;
             top: 0;
             left: 0;
@@ -37,17 +38,32 @@
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 4rem 2rem;
+            padding: 3rem 1rem;
             z-index: 10;
+            box-sizing: border-box;
         }
 
-        .gold-text {
+        .main-title {
             font-family: 'Cinzel', serif;
-            background: linear-gradient(to bottom, #f4e4bc 0%, #d4af37 50%, #f4e4bc 100%);
+            font-size: clamp(2rem, 8vw, 4rem);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            background: linear-gradient(to bottom, #f4e4bc 0%, var(--metallic-gold) 50%, #f4e4bc 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.3));
+            filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.4));
+            margin: 0;
         }
+
+        .footer-text {
+            color: var(--rose-pink);
+            font-style: italic;
+            font-size: 1.1rem;
+            letter-spacing: 0.1em;
+            opacity: 0.8;
+        }
+
+        canvas { touch-action: none; }
     </style>
 
     <script type="importmap">
@@ -65,132 +81,118 @@
 <body>
     <div id="root"></div>
 
-    <div class="ui-overlay">
-        <h1 class="gold-text text-5xl md:text-7xl tracking-widest opacity-90">Happy Birthday</h1>
-        <p class="text-pink-300 font-serif italic text-lg tracking-widest">Rose Gold & Ivory Elegance</p>
+    <div class="ui-container">
+        <h1 class="main-title">Happy Birthday</h1>
+        <div class="footer-text">Sophistication in Rose & Gold</div>
     </div>
 
     <script type="module">
-        import React, { useRef, useMemo } from 'react';
+        import React, { useRef } from 'react';
         import { createRoot } from 'react-dom';
         import * as THREE from 'three';
         import { Canvas, useFrame } from '@react-three/fiber';
-        import { Float, OrbitControls, Stars, ContactShadows, Environment, MeshReflectorMaterial } from '@react-three/drei';
+        import { Float, OrbitControls, Stars, ContactShadows, Environment, MeshReflectorMaterial, Sparkles } from '@react-three/drei';
 
         const COLORS = {
             ivory: "#FFFFF0",
             rosePink: "#F19EB5",
-            metallicGold: "#D4AF37",
-            bg: "#050505"
+            metallicGold: "#D4AF37"
         };
 
-        const CakeStage = () => {
-            const group = useRef();
-            
-            // 优雅的缓慢旋转
+        const CakeModel = () => {
+            const cakeGroup = useRef();
+
+            // 缓动旋转动效
             useFrame((state) => {
-                group.current.rotation.y = Math.sin(state.clock.getElapsedTime() * 0.3) * 0.2;
+                const t = state.clock.getElapsedTime();
+                cakeGroup.current.rotation.y = Math.sin(t * 0.2) * 0.15;
             });
 
-            return React.createElement('group', { ref: group, position: [0, -0.5, 0] },
-                // --- 蛋糕主体 ---
-                // 底层 (象牙白)
+            return React.createElement('group', { ref: cakeGroup, position: [0, -0.8, 0] },
+                // 1. 底层 (象牙白)
                 React.createElement('mesh', { position: [0, 0, 0], castShadow: true },
-                    React.createElement('cylinderGeometry', { args: [2, 2, 1.2, 64] }),
-                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.1 })
+                    React.createElement('cylinderGeometry', { args: [2.2, 2.2, 1.2, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.2 })
                 ),
-                // 中层 (玫瑰粉)
-                React.createElement('mesh', { position: [0, 1.1, 0], castShadow: true },
-                    React.createElement('cylinderGeometry', { args: [1.4, 1.4, 1, 64] }),
-                    React.createElement('meshStandardMaterial', { color: COLORS.rosePink, roughness: 0.2 })
+                // 2. 中层 (玫瑰粉)
+                React.createElement('mesh', { position: [0, 1.15, 0], castShadow: true },
+                    React.createElement('cylinderGeometry', { args: [1.6, 1.6, 1.1, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.rosePink, roughness: 0.3 })
                 ),
-                // 顶层 (象牙白)
-                React.createElement('mesh', { position: [0, 2, 0], castShadow: true },
-                    React.createElement('cylinderGeometry', { args: [0.8, 0.8, 0.8, 64] }),
-                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.1 })
+                // 3. 顶层 (象牙白)
+                React.createElement('mesh', { position: [0, 2.2, 0], castShadow: true },
+                    React.createElement('cylinderGeometry', { args: [1, 1, 1, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.2 })
                 ),
 
-                // --- 金属金装饰圈 ---
+                // 金属装饰环
                 [
-                    [2.05, 0.0, 0.05], // 底层金边
-                    [1.45, 1.1, 0.04], // 中层金边
-                    [0.85, 2.0, 0.03]  // 顶层金边
-                ].map(([radius, y, thick], i) => (
+                    [2.25, 0, 0.05], 
+                    [1.65, 1.15, 0.04], 
+                    [1.05, 2.2, 0.04]
+                ].map(([r, y, t], i) => (
                     React.createElement('mesh', { key: i, position: [0, y, 0], rotation: [Math.PI/2, 0, 0] },
-                        React.createElement('torusGeometry', { args: [radius, thick, 16, 100] }),
-                        React.createElement('meshStandardMaterial', { 
-                            color: COLORS.metallicGold, 
-                            metalness: 1, 
-                            roughness: 0.1 
-                        })
+                        React.createElement('torusGeometry', { args: [r, t, 16, 100] }),
+                        React.createElement('meshStandardMaterial', { color: COLORS.metallicGold, metalness: 1, roughness: 0.1 })
                     )
                 )),
 
-                // --- 蜡烛 ---
-                React.createElement('group', { position: [0, 2.4, 0] },
+                // 蜡烛与星光
+                React.createElement('group', { position: [0, 2.8, 0] },
                     React.createElement('mesh', null,
-                        React.createElement('cylinderGeometry', { args: [0.05, 0.05, 0.5] }),
-                        React.createElement('meshStandardMaterial', { color: COLORS.metallicGold, metalness: 0.8 })
+                        React.createElement('cylinderGeometry', { args: [0.04, 0.04, 0.6] }),
+                        React.createElement('meshStandardMaterial', { color: COLORS.metallicGold, metalness: 0.9 })
                     ),
-                    React.createElement(Float, { speed: 4, rotationIntensity: 1, floatIntensity: 2 },
-                        React.createElement('pointLight', { intensity: 1.5, distance: 3, color: "#ff8800" }),
-                        React.createElement('mesh', { position: [0, 0.4, 0] },
-                            React.createElement('sphereGeometry', { args: [0.06, 16, 16] }),
-                            React.createElement('meshBasicMaterial', { color: "#ffcc00" })
-                        )
+                    React.createElement(Sparkles, { count: 20, scale: 2, size: 4, speed: 0.4, color: COLORS.metallicGold }),
+                    React.createElement('pointLight', { intensity: 2, distance: 4, color: "#ff9900" }),
+                    React.createElement('mesh', { position: [0, 0.4, 0] },
+                        React.createElement('sphereGeometry', { args: [0.06, 16, 16] }),
+                        React.createElement('meshBasicMaterial', { color: "#ffcc00" })
                     )
                 )
             );
         };
 
-        const App = () => {
+        const Scene = () => {
             return React.createElement(Canvas, { 
                 shadows: true, 
-                camera: { position: [0, 3, 10], fov: 35 },
-                dpr: [1, 2] // 优化高分屏显示
+                camera: { position: [0, 2, 10], fov: 35 },
+                gl: { antialias: true }
             },
-                React.createElement('color', { attach: "background", args: [COLORS.bg] }),
+                React.createElement('color', { attach: "background", args: ["#050505"] }),
+                React.createElement('ambientLight', { intensity: 0.5 }),
+                React.createElement('spotLight', { position: [10, 10, 10], angle: 0.15, penumbra: 1, intensity: 2, castShadow: true }),
                 
-                // 光影设置
-                React.createElement('ambientLight', { intensity: 0.4 }),
-                React.createElement('spotLight', { position: [5, 10, 5], angle: 0.3, penumbra: 1, intensity: 2, castShadow: true }),
-                React.createElement('pointLight', { position: [-5, 5, -5], color: COLORS.rosePink, intensity: 1 }),
+                React.createElement(CakeModel, null),
+                
+                // 动态背景粒子
+                React.createElement(Stars, { radius: 50, count: 3000, factor: 4, fade: true }),
 
-                // 环境与粒子
-                React.createElement(Stars, { radius: 100, depth: 50, count: 2000, factor: 4, saturation: 0 }),
-                React.createElement(Environment, { preset: "apartment" }),
+                // 环境映射让金色更亮
+                React.createElement(Environment, { preset: "city" }),
 
-                // 核心蛋糕
-                React.createElement(CakeStage, null),
-
-                // 反射地面
-                React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -1.1, 0] },
-                    React.createElement('planeGeometry', { args: [20, 20] }),
+                // 镜面反射地面
+                React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -2, 0] },
+                    React.createElement('planeGeometry', { args: [50, 50] }),
                     React.createElement(MeshReflectorMaterial, {
-                        blur: [300, 100],
+                        blur: [400, 100],
                         resolution: 1024,
                         mixBlur: 1,
-                        mixStrength: 40,
-                        roughness: 1,
-                        depthScale: 1.2,
-                        minDepthThreshold: 0.4,
-                        maxDepthThreshold: 1.4,
-                        color: "#101010",
-                        metalness: 0.5
+                        mixStrength: 15,
+                        depthScale: 1,
+                        minDepthThreshold: 0.85,
+                        color: "#151515",
+                        metalness: 0.5,
+                        roughness: 1
                     })
                 ),
 
-                React.createElement(OrbitControls, { 
-                    enableZoom: false, 
-                    enablePan: false,
-                    minPolarAngle: Math.PI / 3,
-                    maxPolarAngle: Math.PI / 2 
-                })
+                React.createElement(OrbitControls, { enableZoom: false, minPolarAngle: Math.PI / 4, maxPolarAngle: Math.PI / 2.1 })
             );
         };
 
         const root = createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        root.render(React.createElement(Scene));
     </script>
 </body>
 </html>
