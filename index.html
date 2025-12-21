@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rose Gold & Ivory 3D Celebration</title>
+    <title>Rose Gold 3D - Ultimate Edition</title>
+    <link rel="icon" href="data:,">
     <style>
         @import url('https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap');
 
@@ -20,34 +21,33 @@
             color: var(--ivory); font-family: 'Playfair Display', serif;
         }
 
-        .ui-container {
+        .ui-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; flex-direction: column;
             align-items: center; justify-content: space-between;
-            padding: 4rem 1rem; z-index: 10; box-sizing: border-box;
+            padding: 5rem 1rem; z-index: 10;
         }
 
+        .title-group { text-align: center; }
         .main-title {
             font-family: 'Cinzel', serif;
-            font-size: clamp(2rem, 8vw, 4rem);
-            letter-spacing: 0.3em;
+            font-size: clamp(1.5rem, 5vw, 3rem);
+            letter-spacing: 0.4em;
             background: linear-gradient(to bottom, #f4e4bc 0%, var(--metallic-gold) 50%, #f4e4bc 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            transition: all 1s ease;
-            opacity: 0.9;
+            margin-bottom: 0.5rem;
         }
 
-        .hint-text {
+        .tap-indicator {
             color: var(--rose-pink);
-            font-size: 0.9rem;
-            letter-spacing: 0.2em;
+            font-size: 0.75rem;
+            letter-spacing: 0.3em;
             text-transform: uppercase;
-            animation: pulse 2s infinite;
+            animation: breathe 3s ease-in-out infinite;
         }
 
-        @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
-        canvas { touch-action: none; cursor: pointer; }
+        @keyframes breathe { 0%, 100% { opacity: 0.2; transform: translateY(0); } 50% { opacity: 0.7; transform: translateY(-5px); } }
     </style>
 
     <script type="importmap">
@@ -65,136 +65,132 @@
 <body>
     <div id="root"></div>
 
-    <div class="ui-container">
-        <h1 class="main-title">Happy Birthday</h1>
-        <div class="hint-text">Click to light the magic</div>
+    <div class="ui-overlay">
+        <div class="title-group">
+            <h1 class="main-title">Happy Birthday</h1>
+            <p style="color:rgba(255,255,255,0.4); font-size:0.8rem; letter-spacing: 0.5em;">EST. 2025</p>
+        </div>
+        <div class="tap-indicator">Touch to Ignite</div>
     </div>
 
     <script type="module">
-        import React, { useRef, useState, useMemo } from 'react';
+        import React, { useRef, useState, useMemo, useEffect } from 'react';
         import { createRoot } from 'react-dom';
         import * as THREE from 'three';
-        import { Canvas, useFrame } from '@react-three/fiber';
-        import { Float, OrbitControls, Stars, Environment, MeshReflectorMaterial, Sparkles, PresentationControls } from '@react-three/drei';
+        import { Canvas, useFrame, useThree } from '@react-three/fiber';
+        import { PresentationControls, Float, Environment, MeshReflectorMaterial, Sparkles, Stars } from '@react-three/drei';
 
         const COLORS = {
             ivory: "#FFFFF0",
             rosePink: "#F19EB5",
-            metallicGold: "#D4AF37",
-            candleOrange: "#FF9D00"
+            gold: "#D4AF37",
+            flame: "#FF8000"
         };
 
-        // 漂浮的纸屑组件
-        const Confetti = ({ count = 50 }) => {
-            const range = 15;
-            const data = useMemo(() => Array.from({ length: count }, () => ({
-                pos: [THREE.MathUtils.randFloatSpread(range), THREE.MathUtils.randFloat(0, range), THREE.MathUtils.randFloatSpread(range)],
-                speed: THREE.MathUtils.randFloat(0.01, 0.05),
-                rot: Math.random() * Math.PI
-            })), [count]);
-
-            const refs = useRef([]);
-            useFrame(() => {
-                refs.current.forEach((ref, i) => {
-                    ref.position.y -= data[i].speed;
-                    ref.rotation.x += data[i].speed;
-                    if (ref.position.y < -2) ref.position.y = range;
-                });
-            });
-
-            return data.map((d, i) => (
-                React.createElement('mesh', { 
-                    key: i, 
-                    ref: el => refs.current[i] = el, 
-                    position: d.pos,
-                    rotation: [d.rot, d.rot, d.rot]
-                },
-                    React.createElement('planeGeometry', { args: [0.1, 0.1] }),
-                    React.createElement('meshBasicMaterial', { 
-                        color: i % 2 === 0 ? COLORS.rosePink : COLORS.metallicGold, 
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        opacity: 0.6
-                    })
-                )
-            ));
+        // 深度检查后的材质修复函数
+        const ColorCorrect = () => {
+            const { gl } = useThree();
+            useEffect(() => {
+                // 强制应用最新的色彩空间标准
+                gl.outputColorSpace = THREE.SRGBColorSpace;
+                gl.toneMapping = THREE.ACESFilmicToneMapping;
+            }, [gl]);
+            return null;
         };
 
         const CakeModel = ({ active }) => {
-            const cakeGroup = useRef();
-
+            const group = useRef();
+            
             useFrame((state) => {
                 const t = state.clock.getElapsedTime();
-                cakeGroup.current.rotation.y = Math.sin(t * 0.15) * 0.1;
+                if (group.current) {
+                    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, t * 0.15, 0.1);
+                }
             });
 
-            return React.createElement('group', { ref: cakeGroup, position: [0, -0.8, 0] },
-                // 蛋糕层
-                [[2.2, 1.2, 0, COLORS.ivory], [1.6, 1.1, 1.15, COLORS.rosePink], [1, 1, 2.2, COLORS.ivory]].map(([r, h, y, col], i) => (
-                    React.createElement('mesh', { key: i, position: [0, y, 0], castShadow: true },
-                        React.createElement('cylinderGeometry', { args: [r, r, h, 64] }),
-                        React.createElement('meshStandardMaterial', { color: col, roughness: 0.2, metalness: 0.1 })
+            return React.createElement('group', { ref: group, position: [0, -0.8, 0] },
+                // 核心分层结构
+                React.createElement('mesh', { position: [0, 0, 0], castShadow: true },
+                    React.createElement('cylinderGeometry', { args: [2, 2, 1.2, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.1 })
+                ),
+                React.createElement('mesh', { position: [0, 1.1, 0], castShadow: true },
+                    React.createElement('cylinderGeometry', { args: [1.5, 1.5, 1, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.rosePink, roughness: 0.2 })
+                ),
+                React.createElement('mesh', { position: [0, 2, 0], castShadow: true },
+                    React.createElement('cylinderGeometry', { args: [0.9, 0.9, 0.8, 64] }),
+                    React.createElement('meshStandardMaterial', { color: COLORS.ivory, roughness: 0.1 })
+                ),
+
+                // 金属线条装饰 (优化后的几何体)
+                [2.02, 1.52, 0.92].map((r, i) => (
+                    React.createElement('mesh', { key: i, position: [0, i * 1.0, 0], rotation: [Math.PI/2, 0, 0] },
+                        React.createElement('torusGeometry', { args: [r, 0.03, 16, 100] }),
+                        React.createElement('meshStandardMaterial', { color: COLORS.gold, metalness: 1, roughness: 0.05 })
                     )
                 )),
 
-                // 金属装饰环
-                [[2.25, 0], [1.65, 1.15], [1.05, 2.2]].map(([r, y], i) => (
-                    React.createElement('mesh', { key: i, position: [0, y, 0], rotation: [Math.PI/2, 0, 0] },
-                        React.createElement('torusGeometry', { args: [r, 0.04, 16, 100] }),
-                        React.createElement('meshStandardMaterial', { color: COLORS.metallicGold, metalness: 1, roughness: 0.1 })
-                    )
-                )),
-
-                // 蜡烛交互部分
-                React.createElement('group', { position: [0, 2.8, 0] },
-                    React.createElement('mesh', null,
-                        React.createElement('cylinderGeometry', { args: [0.04, 0.04, 0.6] }),
-                        React.createElement('meshStandardMaterial', { color: COLORS.metallicGold, metalness: 0.9 })
+                // 交互式蜡烛
+                React.createElement('group', { position: [0, 2.4, 0] },
+                    React.createElement('mesh', { position: [0, 0.2, 0] },
+                        React.createElement('cylinderGeometry', { args: [0.03, 0.03, 0.5] }),
+                        React.createElement('meshStandardMaterial', { color: COLORS.gold, metalness: 0.9 })
                     ),
                     active && React.createElement(React.Fragment, null,
-                        React.createElement(Sparkles, { count: 30, scale: 2.5, size: 3, speed: 0.5, color: COLORS.metallicGold }),
-                        React.createElement('pointLight', { intensity: 4, distance: 6, color: COLORS.candleOrange }),
-                        React.createElement('mesh', { position: [0, 0.45, 0] },
-                            React.createElement('sphereGeometry', { args: [0.08, 16, 16] }),
-                            React.createElement('meshBasicMaterial', { color: "#FFF" })
+                        React.createElement(Sparkles, { count: 50, scale: 1.5, size: 4, speed: 0.5, color: COLORS.gold }),
+                        React.createElement('pointLight', { intensity: 10, distance: 5, color: COLORS.flame }),
+                        React.createElement(Float, { speed: 5, rotationIntensity: 2, floatIntensity: 2 },
+                            React.createElement('mesh', { position: [0, 0.55, 0] },
+                                React.createElement('sphereGeometry', { args: [0.07, 16, 16] }),
+                                React.createElement('meshBasicMaterial', { color: "#ffffff" })
+                            )
                         )
                     )
                 )
             );
         };
 
-        const Scene = () => {
-            const [active, setActive] = useState(false);
+        const RootApp = () => {
+            const [isLit, setIsLit] = useState(false);
 
             return React.createElement(Canvas, { 
-                shadows: true, camera: { position: [0, 2, 10], fov: 35 },
-                onClick: () => setActive(true)
+                shadows: true, 
+                camera: { position: [0, 2, 8], fov: 40 },
+                dpr: [1, 1.5], // 限制 DPR 以防移动端过热
+                onPointerDown: () => setIsLit(true)
             },
+                React.createElement(ColorCorrect, null),
                 React.createElement('color', { attach: "background", args: ["#050505"] }),
-                React.createElement('ambientLight', { intensity: active ? 0.6 : 0.2 }),
-                React.createElement('spotLight', { position: [10, 10, 10], angle: 0.15, penumbra: 1, intensity: active ? 2 : 0.5, castShadow: true }),
                 
-                React.createElement(PresentationControls, { global: true, config: { mass: 2, tension: 500 }, snap: true, rotation: [0, 0.3, 0], polar: [-Math.PI / 4, Math.PI / 4] },
-                    React.createElement(CakeModel, { active: active })
+                // 灯光系统
+                React.createElement('ambientLight', { intensity: isLit ? 0.8 : 0.3 }),
+                React.createElement('spotLight', { position: [10, 10, 10], angle: 0.15, penumbra: 1, intensity: 5, castShadow: true }),
+
+                // 交互控制器 (带弹性系数)
+                React.createElement(PresentationControls, { 
+                    global: true, snap: true, speed: 1.5, 
+                    rotation: [0, 0.5, 0], polar: [-Math.PI / 6, Math.PI / 6] 
+                },
+                    React.createElement(CakeModel, { active: isLit })
                 ),
 
-                active && React.createElement(Confetti, { count: 80 }),
-                React.createElement(Stars, { radius: 50, count: 2000, factor: 4, fade: true }),
-                React.createElement(Environment, { preset: "city" }),
+                React.createElement(Stars, { radius: 100, count: 3000, factor: 4 }),
+                React.createElement(Environment, { preset: "apartment" }),
 
-                // 镜面反射地面
-                React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -2, 0] },
-                    React.createElement('planeGeometry', { args: [50, 50] }),
+                // 地面反射 (优化分辨率以解决渲染性能报错)
+                React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -1.5, 0] },
+                    React.createElement('planeGeometry', { args: [20, 20] }),
                     React.createElement(MeshReflectorMaterial, {
-                        blur: [400, 100], resolution: 1024, mixBlur: 1, mixStrength: 15,
-                        depthScale: 1, minDepthThreshold: 0.85, color: "#151515", metalness: 0.5, roughness: 1
+                        blur: [400, 100], resolution: 512, mixBlur: 1, mixStrength: 30,
+                        depthScale: 1, minDepthThreshold: 0.8, color: "#101010", metalness: 0.5
                     })
                 )
             );
         };
 
         const root = createRoot(document.getElementById('root'));
-        root.render(React.createElement(Scene));
+        root.render(React.createElement(RootApp));
     </script>
 </body>
 </html>
